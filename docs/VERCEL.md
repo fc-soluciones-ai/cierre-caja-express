@@ -37,6 +37,19 @@ Hay que volver a correrlo **cada vez que cambie la contraseña de Supabase**, y
 después volver a desplegar: los despliegues ya hechos conservan los valores que
 tenían.
 
+### Si dice que no encuentra la sesión
+
+El CLI de Vercel guarda las credenciales en una ruta que depende de la consola
+desde la que se corra. Puede pasar que Git Bash vea la sesión y PowerShell no,
+aunque sea el mismo usuario y la misma máquina.
+
+La solución es iniciar sesión desde la consola donde va a trabajar:
+
+
+
+El comando comprueba la sesión antes de tocar nada, así que un fallo así no
+deja el proyecto con unas variables nuevas y otras viejas.
+
 | Variable | De dónde sale |
 |---|---|
 | `DATABASE_URL` | Del `.env`, conexión agrupada |

@@ -47,12 +47,34 @@ const VARIABLES: Variable[] = [
   { nombre: 'IMPRESORA_ANCHO_CARACTERES', obligatoria: false, valor: '48' },
 ];
 
-function vercel(argumentos: string[], entrada?: string): void {
-  execFileSync('npx', ['vercel', ...argumentos], {
+function vercel(argumentos: string[], entrada?: string): string {
+  return execFileSync('npx', ['vercel', ...argumentos], {
     input: entrada,
-    stdio: entrada === undefined ? 'inherit' : ['pipe', 'pipe', 'pipe'],
+    stdio: entrada === undefined ? ['inherit', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
     shell: true,
+    encoding: 'utf8',
   });
+}
+
+/**
+ * Comprueba la sesion ANTES de tocar nada.
+ *
+ * El CLI guarda las credenciales en una ruta que depende de la consola desde
+ * la que se corra: en PowerShell puede no encontrar la sesion que si ve Git
+ * Bash. Sin esta comprobacion, el fallo aparece a mitad de la subida y deja
+ * el proyecto con unas variables nuevas y otras viejas.
+ */
+function exigirSesionDeVercel(): void {
+  try {
+    const quien = vercel(['whoami'], '').trim().split('\n').pop() ?? '';
+    console.log(`Sesion de Vercel: ${quien}\n`);
+  } catch {
+    throw new Error(
+      'El CLI de Vercel no encuentra su sesion en esta consola.\n' +
+        '  Ejecute:  vercel login\n' +
+        '  Si ya inicio sesion en otra consola, cierre esta y abra una nueva.',
+    );
+  }
 }
 
 function main(): void {
@@ -78,14 +100,10 @@ function main(): void {
     if (!APLICAR) continue;
 
     for (const entorno of ENTORNOS) {
-      // Se borra antes de agregar: el CLI no reemplaza una variable existente
-      // y fallar a la mitad dejaria el proyecto con valores mezclados.
-      try {
-        vercel(['env', 'rm', variable.nombre, entorno, '--yes'], '');
-      } catch {
-        // No existia. Es el caso normal la primera vez.
-      }
-      vercel(['env', 'add', variable.nombre, entorno], valor);
+      // --force reemplaza en un solo paso. Borrar y volver a agregar dejaba
+      // la variable en el aire si el segundo paso fallaba, y con DATABASE_URL
+      // eso significa una aplicacion en produccion sin base de datos.
+      vercel(['env', 'add', variable.nombre, entorno, '--force', '--sensitive'], valor);
     }
   }
 
