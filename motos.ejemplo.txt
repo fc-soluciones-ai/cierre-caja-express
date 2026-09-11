@@ -1,0 +1,15 @@
+# Flota de motocicletas. Una por linea.
+#
+#   placa; marca; modelo; anio; kilometraje; comodin; repartidor
+#
+# Los dos ultimos campos son opcionales.
+#   comodin     escriba COMODIN en la moto de reemplazo. Solo puede haber una.
+#   repartidor  nombre como esta en el padron, o el codigo de Soft Restaurant.
+#
+# Copie este archivo como motos.txt, llenelo con sus motos y corra:
+#   npm run db:motos                 para ver que haria
+#   npm run db:motos -- --aplicar    para darlas de alta
+#
+# MOT-123; Honda;  CB125; 2022; 18400;        ; DAVID-R
+# MOT-456; Bajaj;  Boxer; 2021; 41500;        ; 12
+# MOT-789; Yamaha; YBR;   2023;  5200; COMODIN

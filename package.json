@@ -1,5 +1,5 @@
 {
-  "name": "cierre-caja-express",
+  "name": "control-express",
   "version": "0.1.0",
   "private": true,
   "description": "Gestion de efectivo, abonos parciales y cierres de turno para repartidores express",
@@ -32,7 +32,8 @@
     "db:push:pruebas": "tsx scripts/preparar-base-de-pruebas.ts",
     "vercel:variables": "tsx scripts/vercel-variables.ts",
     "test:flota": "tsx scripts/base-de-pruebas.ts scripts/verificar-flota.ts",
-    "demo:flota": "tsx scripts/base-de-pruebas.ts scripts/demo-flota.ts"
+    "demo:flota": "tsx scripts/base-de-pruebas.ts scripts/demo-flota.ts",
+    "db:motos": "tsx scripts/cargar-motos.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

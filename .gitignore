@@ -34,3 +34,6 @@ Desktop.ini
 
 # Compilacion del servidor de demostracion
 .next-demo/
+
+# Lista de la flota real: datos del negocio, no del programa
+motos.txt
