@@ -64,7 +64,7 @@ export function exportarHistorialAExcel(parametros: ParametrosExportacion): {
   // --- Hoja de resumen ---
   const m = parametros.metricas;
   const resumen: unknown[][] = [
-    ['Cierre Caja Express - Reporte de historial'],
+    ['Control Express - Reporte de historial'],
     ['Filtro aplicado', parametros.descripcionFiltro],
     ['Generado', formatearFechaHora(new Date())],
     [],
@@ -93,7 +93,7 @@ export function exportarHistorialAExcel(parametros: ParametrosExportacion): {
     'Fecha y hora',
     'Evento',
     'Repartidor',
-    'Cajero',
+    'Usuario',
     'Monto',
     'Dispositivo',
     'Entidad',

@@ -80,7 +80,7 @@ export function BarraSuperior({
         </div>
 
         <div className="text-right">
-          <p className="text-xs uppercase tracking-widest text-slate-500">En caja</p>
+          <p className="text-xs uppercase tracking-widest text-slate-500">Usuario</p>
           <p className="text-lg font-bold">{cajero}</p>
           <button
             type="button"

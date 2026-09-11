@@ -1,4 +1,4 @@
-# Cierre Caja Express
+# Control Express
 
 Gestión de efectivo para repartidores de pizzería: recepción de abonos
 parciales durante el turno, cierre de turno conciliado contra los reportes de

@@ -74,7 +74,7 @@ export function tiqueteAbono(datos: DatosTiqueteAbono): DocumentoTiquete {
       { t: 'par', etiqueta: 'Repartidor', valor: datos.chofer.nombre },
       { t: 'par', etiqueta: 'Codigo mesero', valor: datos.chofer.idMeseroSoftRestaurant },
       { t: 'par', etiqueta: 'Fecha y hora', valor: formatearFechaHora(datos.timestamp) },
-      { t: 'par', etiqueta: 'Cajero', valor: datos.cajero },
+      { t: 'par', etiqueta: 'Usuario', valor: datos.cajero },
       ...(datos.dispositivo
         ? [{ t: 'par' as const, etiqueta: 'Caja', valor: datos.dispositivo }]
         : []),
@@ -131,7 +131,7 @@ export function tiqueteCierreChofer(datos: DatosTiqueteCierre): DocumentoTiquete
     { t: 'par', etiqueta: 'Codigo mesero', valor: datos.chofer.idMeseroSoftRestaurant },
     { t: 'par', etiqueta: 'Apertura', valor: formatearFechaHora(datos.turno.fechaApertura) },
     { t: 'par', etiqueta: 'Cierre', valor: formatearFechaHora(datos.turno.fechaCierre) },
-    { t: 'par', etiqueta: 'Cajero', valor: datos.cajero },
+    { t: 'par', etiqueta: 'Usuario', valor: datos.cajero },
 
     { t: 'separador', caracter: '=' },
     { t: 'linea', texto: 'VENTAS SEGUN SISTEMA', negrita: true },
@@ -217,7 +217,7 @@ export function tiqueteArqueo(datos: DatosTiqueteArqueo): DocumentoTiquete {
   const bloques: BloqueTiquete[] = [
     ...encabezado('Arqueo de caja', `Dia operativo ${datos.diaOperativo}`),
     { t: 'par', etiqueta: 'Fecha y hora', valor: formatearFechaHora(datos.timestamp) },
-    { t: 'par', etiqueta: 'Cajero', valor: datos.cajero },
+    { t: 'par', etiqueta: 'Usuario', valor: datos.cajero },
     { t: 'separador' },
   ];
 
@@ -303,7 +303,7 @@ export function tiqueteCierreGrupal(datos: DatosTiqueteCierreGrupal): DocumentoT
   const bloques: BloqueTiquete[] = [
     ...encabezado('Cierre grupal', `Dia operativo ${datos.diaOperativo}`),
     { t: 'par', etiqueta: 'Fecha y hora', valor: formatearFechaHora(datos.timestamp) },
-    { t: 'par', etiqueta: 'Cajero', valor: datos.cajero },
+    { t: 'par', etiqueta: 'Usuario', valor: datos.cajero },
     { t: 'par', etiqueta: 'Repartidores cerrados', valor: String(datos.choferes.length) },
     { t: 'separador', caracter: '=' },
   ];

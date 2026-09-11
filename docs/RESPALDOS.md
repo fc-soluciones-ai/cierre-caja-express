@@ -96,7 +96,7 @@ borraría el último respaldo que queda. Ambos números se ajustan en `.env`.
 Abra una consola **como administrador** en la carpeta del proyecto y ejecute:
 
 ```bash
-schtasks /create /tn "Respaldo Cierre Caja Express" /tr "\"%CD%\scripts\respaldo-diario.cmd\"" /sc daily /st 04:00 /rl highest
+schtasks /create /tn "Respaldo Control Express" /tr "\"%CD%\scripts\respaldo-diario.cmd\"" /sc daily /st 04:00 /rl highest
 ```
 
 Corre todos los días a las 4 de la mañana, cuando la caja ya cerró. Si el
@@ -107,7 +107,7 @@ copiado nada.
 Para comprobar cuándo corrió por última vez:
 
 ```bash
-schtasks /query /tn "Respaldo Cierre Caja Express" /v /fo list
+schtasks /query /tn "Respaldo Control Express" /v /fo list
 ```
 
 ---

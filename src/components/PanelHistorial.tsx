@@ -301,7 +301,7 @@ export function PanelHistorial({
                   <th className="pb-2">Fecha y hora</th>
                   <th className="pb-2">Evento</th>
                   <th className="pb-2">Repartidor</th>
-                  <th className="pb-2">Cajero</th>
+                  <th className="pb-2">Usuario</th>
                   <th className="pb-2 text-right">Monto</th>
                   <th className="pb-2 print:hidden" />
                 </tr>
@@ -459,7 +459,7 @@ function FichaDetalle({ fila, alCerrar }: { fila: FilaHistorial; alCerrar: () =>
 
         <dl className="mt-5 grid gap-3 sm:grid-cols-2">
           <Dato etiqueta="Repartidor" valor={fila.choferNombre ?? '—'} />
-          <Dato etiqueta="Cajero" valor={fila.cajeroNombre ?? '—'} />
+          <Dato etiqueta="Usuario" valor={fila.cajeroNombre ?? '—'} />
           <Dato
             etiqueta="Monto"
             valor={fila.monto === null ? '—' : formatearMoneda(fila.monto)}

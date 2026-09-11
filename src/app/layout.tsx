@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Cierre Caja Express',
+  title: 'Control Express',
   description: 'Abonos parciales y cierre de turno de repartidores',
 };
 

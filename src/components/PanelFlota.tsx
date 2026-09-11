@@ -228,7 +228,7 @@ export function PanelFlota({ resumen, historial, placas, filtros, descripcion }:
                   <th className="pb-2">Proveedor</th>
                   <th className="pb-2 text-right">Odometro</th>
                   <th className="pb-2 pr-6 text-right">Costo</th>
-                  <th className="pb-2">Cajero</th>
+                  <th className="pb-2">Usuario</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-borde">

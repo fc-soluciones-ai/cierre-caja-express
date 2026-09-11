@@ -54,7 +54,7 @@ export function FormularioEntrada({ cajeros }: Props) {
   return (
     <div className="tarjeta p-6">
       <label className="block text-sm uppercase tracking-wide text-slate-500" htmlFor="cajero">
-        Cajero
+        Usuario
       </label>
       <select
         id="cajero"

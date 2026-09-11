@@ -1,4 +1,4 @@
-# Cierre Caja Express — Arquitectura
+# Control Express — Arquitectura
 
 Sistema de recepción parcial de efectivo y cierre de turno para repartidores
 express, conciliado contra los reportes de venta por mesero de Soft Restaurant

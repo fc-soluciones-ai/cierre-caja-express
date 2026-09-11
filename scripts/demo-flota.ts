@@ -16,7 +16,14 @@ import { hashearPin } from '@/server/services/pin';
 import { registrarMantenimiento } from '@/server/services/mantenimiento';
 import { asignarMoto, cambiarEstadoMoto, crearMoto } from '@/server/services/motos';
 
-const PIN_DEMO = '1111';
+/**
+ * PIN de la demostracion. Se escribe aqui a proposito: esta base no tiene
+ * nada del negocio. El del negocio nunca aparece en un archivo.
+ *
+ * No es 1111 porque el sistema rechaza los PIN de un solo digito repetido,
+ * y la demostracion tiene que comportarse como la caja de verdad.
+ */
+const PIN_DEMO = '2026';
 
 async function main(): Promise<void> {
   exigirBaseDePruebas();
@@ -180,7 +187,7 @@ async function main(): Promise<void> {
   });
 
   console.log('\nFlota de demostracion lista.');
-  console.log(`  Cajero: Demostracion   PIN: ${PIN_DEMO}`);
+  console.log(`  Usuario: Demostracion   PIN: ${PIN_DEMO}`);
   console.log(`  Token de sesion: ${token}\n`);
 }
 
