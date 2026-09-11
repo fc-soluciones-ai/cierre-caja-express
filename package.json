@@ -23,7 +23,7 @@
     "test:respaldo": "tsx scripts/base-de-pruebas.ts scripts/verificar-respaldo.ts",
     "db:repartidores": "tsx scripts/cargar-repartidores.ts",
     "ejemplos": "tsx scripts/generar-ejemplos.ts",
-    "demo": "tsx scripts/preparar-demo.ts",
+    "demo": "tsx scripts/dev-demo.ts",
     "pin": "tsx scripts/cambiar-pin.ts",
     "test:sesion": "tsx scripts/base-de-pruebas.ts scripts/verificar-sesion.ts",
     "datos:exportar": "tsx scripts/exportar-datos.ts",
@@ -31,7 +31,8 @@
     "db:conectar": "tsx scripts/conectar-supabase.ts",
     "db:push:pruebas": "tsx scripts/preparar-base-de-pruebas.ts",
     "vercel:variables": "tsx scripts/vercel-variables.ts",
-    "test:flota": "tsx scripts/base-de-pruebas.ts scripts/verificar-flota.ts"
+    "test:flota": "tsx scripts/base-de-pruebas.ts scripts/verificar-flota.ts",
+    "demo:flota": "tsx scripts/base-de-pruebas.ts scripts/demo-flota.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

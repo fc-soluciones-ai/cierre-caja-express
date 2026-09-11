@@ -227,7 +227,7 @@ export function PanelFlota({ resumen, historial, placas, filtros, descripcion }:
                   <th className="pb-2">Categoria</th>
                   <th className="pb-2">Proveedor</th>
                   <th className="pb-2 text-right">Odometro</th>
-                  <th className="pb-2 text-right">Costo</th>
+                  <th className="pb-2 pr-6 text-right">Costo</th>
                   <th className="pb-2">Cajero</th>
                 </tr>
               </thead>
@@ -249,7 +249,7 @@ export function PanelFlota({ resumen, historial, placas, filtros, descripcion }:
                     <td className="cifra py-3 text-right text-slate-400">
                       {km(linea.kilometrajeEvento)}
                     </td>
-                    <td className="cifra py-3 text-right font-bold">
+                    <td className="cifra py-3 pr-6 text-right font-bold">
                       {formatearMoneda(linea.costoTotal)}
                     </td>
                     <td className="py-3 text-slate-400">{linea.cajeroNombre}</td>

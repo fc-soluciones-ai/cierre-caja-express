@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // El servidor de demostracion corre a la vez que el de trabajo. Dos
+  // instancias de Next escribiendo la misma carpeta se traban a medio
+  // compilar, asi que la demostracion usa la suya. Ver scripts/dev-demo.ts.
+  distDir: process.env.CARPETA_BUILD ?? '.next',
   // La app corre en un punto de caja, no detras de un CDN: las imagenes de los
   // repartidores se sirven desde public/ sin optimizacion remota.
   images: { unoptimized: true },

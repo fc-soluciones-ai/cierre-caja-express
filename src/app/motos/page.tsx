@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 
 import { GrillaFlota } from '@/components/GrillaFlota';
 import { alertasDeFlota } from '@/server/services/mantenimiento';
-import { listarFlota } from '@/server/services/motos';
+import { choferesSinMoto, listarFlota } from '@/server/services/motos';
 import { cajeroDeSesion } from '@/server/services/sesion';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,11 @@ export default async function Motos() {
   const cajero = await cajeroDeSesion();
   if (!cajero) redirect('/entrar');
 
-  const [flota, alertas] = await Promise.all([listarFlota(), alertasDeFlota()]);
+  const [flota, alertas, choferesLibres] = await Promise.all([
+    listarFlota(),
+    alertasDeFlota(),
+    choferesSinMoto(),
+  ]);
 
   const operativas = flota.filter((m) => m.estado === 'OPERATIVA').length;
   const vencidas = alertas.filter((a) => a.nivel === 'VENCIDO').length;
@@ -57,7 +61,7 @@ export default async function Motos() {
         </div>
       </div>
 
-      <GrillaFlota flota={flota} alertas={alertas} />
+      <GrillaFlota flota={flota} alertas={alertas} choferesLibres={choferesLibres} />
     </main>
   );
 }

@@ -15,8 +15,14 @@ import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { accionCambiarEstadoMoto } from '@/app/motos/acciones';
-import { formatearMoneda } from '@/lib/money/money';
+import {
+  accionAsignarMoto,
+  accionCambiarEstadoMoto,
+  accionCrearMoto,
+  accionEditarMoto,
+  accionLiberarMoto,
+} from '@/app/motos/acciones';
+import { FormularioMoto, type DatosMoto } from '@/components/FormularioMoto';
 import type { AlertaMoto } from '@/server/services/mantenimiento';
 import type { MotoConAsignacion } from '@/server/services/motos';
 import type { EstadoMoto } from '@/types/enums';
@@ -24,6 +30,8 @@ import type { EstadoMoto } from '@/types/enums';
 interface Props {
   flota: MotoConAsignacion[];
   alertas: AlertaMoto[];
+  /** Repartidores activos que hoy no traen ninguna moto. */
+  choferesLibres: Array<{ id: string; nombre: string }>;
 }
 
 const NOMBRE_CATEGORIA: Record<string, string> = {
@@ -58,13 +66,42 @@ const COLOR: Record<Semaforo, { punto: string; borde: string; texto: string }> =
   ROJO: { punto: 'bg-alerta', borde: 'border-alerta/50', texto: 'text-alerta' },
 };
 
-export function GrillaFlota({ flota, alertas }: Props) {
+function enKilometros(km: number): string {
+  return `${km.toLocaleString('es-CR')} km`;
+}
+
+/**
+ * Color del texto del estado.
+ *
+ * Va por el estado y no por el semaforo de la tarjeta: el semaforo mezcla el
+ * estado con los servicios vencidos, y pintar "Operativa" en rojo porque le
+ * falta el aceite se lee como si la moto no sirviera.
+ */
+const COLOR_ESTADO: Record<string, string> = {
+  OPERATIVA: 'text-entrada',
+  EN_MANTENIMIENTO: 'text-aviso',
+  FUERA_DE_SERVICIO: 'text-alerta',
+};
+
+export function GrillaFlota({ flota, alertas, choferesLibres }: Props) {
   const router = useRouter();
   const [cambiando, setCambiando] = useState<MotoConAsignacion | null>(null);
+  const [asignando, setAsignando] = useState<MotoConAsignacion | null>(null);
+  const [editando, setEditando] = useState<MotoConAsignacion | null>(null);
+  const [creando, setCreando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [advertencia, setAdvertencia] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enProceso, setEnProceso] = useState(false);
+
+  const hayComodin = flota.some((m) => m.esComodin);
+
+  /** Deja los avisos en blanco antes de abrir cualquier dialogo. */
+  const limpiar = useCallback(() => {
+    setError(null);
+    setResultado(null);
+    setAdvertencia(null);
+  }, []);
 
   const cambiarEstado = useCallback(
     async (placa: string, estado: EstadoMoto, motivo: string) => {
@@ -94,27 +131,167 @@ export function GrillaFlota({ flota, alertas }: Props) {
     [router],
   );
 
+  const guardarMoto = useCallback(
+    async (datos: DatosMoto) => {
+      setEnProceso(true);
+      setError(null);
+
+      // Las dos ramas van por separado porque el alta devuelve la placa ya
+      // normalizada y la edicion no devuelve nada.
+      if (editando) {
+        const respuesta = await accionEditarMoto(editando.placa, {
+          marca: datos.marca,
+          modelo: datos.modelo,
+          anio: datos.anio,
+          esComodin: datos.esComodin,
+          notas: datos.notas,
+        });
+        setEnProceso(false);
+        if (!respuesta.ok) {
+          setError(respuesta.mensaje);
+          return;
+        }
+        setResultado(`${editando.placa} actualizada.`);
+      } else {
+        const respuesta = await accionCrearMoto(datos);
+        setEnProceso(false);
+        if (!respuesta.ok) {
+          setError(respuesta.mensaje);
+          return;
+        }
+        // Quien teclea "mot-555 b" tiene que ver que quedo como MOT555B.
+        setResultado(`${respuesta.datos.placa} agregada a la flota.`);
+      }
+
+      setEditando(null);
+      setCreando(false);
+      router.refresh();
+    },
+    [editando, router],
+  );
+
+  const asignar = useCallback(
+    async (placa: string, choferId: string) => {
+      setEnProceso(true);
+      setError(null);
+      const respuesta = await accionAsignarMoto(placa, choferId);
+      setEnProceso(false);
+
+      if (!respuesta.ok) {
+        setError(respuesta.mensaje);
+        return;
+      }
+
+      const d = respuesta.datos;
+      const partes = [`${d.placa} queda con ${d.choferNombre}.`];
+      if (d.motoAnterior) partes.push(`Entrega la ${d.motoAnterior}.`);
+      if (d.choferDesplazado) partes.push(`${d.choferDesplazado} se queda sin moto.`);
+      setResultado(partes.join(' '));
+      setAsignando(null);
+      router.refresh();
+    },
+    [router],
+  );
+
+  const liberar = useCallback(
+    async (moto: MotoConAsignacion) => {
+      if (!moto.choferId) return;
+      setEnProceso(true);
+      setError(null);
+      const respuesta = await accionLiberarMoto(moto.choferId);
+      setEnProceso(false);
+
+      if (!respuesta.ok) {
+        setError(respuesta.mensaje);
+        return;
+      }
+
+      setResultado(`${moto.placa} queda libre. ${moto.choferNombre} entrega la moto.`);
+      setAsignando(null);
+      router.refresh();
+    },
+    [router],
+  );
+
+  const botonNueva = (
+    <button
+      type="button"
+      className="boton-tactil bg-entrada px-6 text-slate-950"
+      onClick={() => {
+        limpiar();
+        setCreando(true);
+      }}
+    >
+      ➕ Nueva moto
+    </button>
+  );
+
+  const dialogos = (
+    <>
+      {creando || editando ? (
+        <FormularioMoto
+          moto={editando}
+          hayComodin={hayComodin}
+          enProceso={enProceso}
+          error={error}
+          alGuardar={guardarMoto}
+          alCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+            setError(null);
+          }}
+        />
+      ) : null}
+
+      {cambiando ? (
+        <ModalEstado
+          moto={cambiando}
+          enProceso={enProceso}
+          alCerrar={() => setCambiando(null)}
+          alCambiar={cambiarEstado}
+        />
+      ) : null}
+
+      {asignando ? (
+        <ModalAsignar
+          moto={asignando}
+          choferes={choferesLibres}
+          enProceso={enProceso}
+          alCerrar={() => setAsignando(null)}
+          alAsignar={asignar}
+          alLiberar={liberar}
+        />
+      ) : null}
+    </>
+  );
+
   if (flota.length === 0) {
     return (
-      <div className="tarjeta p-10 text-center">
-        <p className="text-5xl">🏍️</p>
-        <h2 className="mt-4 text-xl font-bold">No hay motos registradas</h2>
-        <p className="mt-2 text-slate-400">
-          Agregue las motos de la flota para llevar su kilometraje y sus gastos.
-        </p>
-      </div>
+      <>
+        <div className="tarjeta p-10 text-center">
+          <p className="text-5xl">🏍️</p>
+          <h2 className="mt-4 text-xl font-bold">No hay motos registradas</h2>
+          <p className="mt-2 text-slate-400">
+            Agregue las motos de la flota para llevar su kilometraje y sus gastos.
+          </p>
+          <div className="mt-6 flex justify-center">{botonNueva}</div>
+        </div>
+        {dialogos}
+      </>
     );
   }
 
   return (
     <>
+      <div className="mb-5 flex justify-end">{botonNueva}</div>
+
       {resultado ? (
         <div className="mb-5 rounded-2xl bg-entrada/15 p-4 text-entrada">{resultado}</div>
       ) : null}
       {advertencia ? (
         <div className="mb-5 rounded-2xl bg-aviso/15 p-4 text-aviso">⚠ {advertencia}</div>
       ) : null}
-      {error ? (
+      {error && !creando && !editando ? (
         <div className="mb-5 rounded-2xl bg-alerta/15 p-4 text-center text-alerta" role="alert">
           {error}
         </div>
@@ -144,32 +321,57 @@ export function GrillaFlota({ flota, alertas }: Props) {
                     Comodin
                   </span>
                 ) : null}
+                <button
+                  type="button"
+                  aria-label={`Editar ${moto.placa}`}
+                  className="h-10 w-10 shrink-0 rounded-full border border-borde text-slate-400 active:scale-95"
+                  onClick={() => {
+                    limpiar();
+                    setEditando(moto);
+                  }}
+                >
+                  ✎
+                </button>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-fondo p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Kilometraje</p>
                   <p className="cifra mt-1 text-xl font-bold">
-                    {formatearMoneda(moto.kilometrajeActual * 100, { conSimbolo: false })}
+                    {enKilometros(moto.kilometrajeActual)}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-fondo p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Estado</p>
-                  <p className={`mt-1 text-sm font-bold ${color.texto}`}>
+                  <p
+                    className={`mt-1 text-sm font-bold ${
+                      COLOR_ESTADO[moto.estado] ?? 'text-slate-300'
+                    }`}
+                  >
                     {NOMBRE_ESTADO[moto.estado] ?? moto.estado}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-3 rounded-2xl bg-fondo p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">La trae</p>
-                <p className="mt-1 truncate font-bold">
+              <button
+                type="button"
+                aria-label={`Cambiar quien trae la ${moto.placa}`}
+                className="mt-3 w-full rounded-2xl bg-fondo p-3 text-left active:scale-[0.99]"
+                onClick={() => {
+                  limpiar();
+                  setAsignando(moto);
+                }}
+              >
+                <span className="block text-xs uppercase tracking-wide text-slate-500">
+                  La trae · toque para cambiar
+                </span>
+                <span className="mt-1 block truncate font-bold">
                   {moto.choferNombre ?? <span className="text-slate-600">Nadie</span>}
                   {moto.tipoAsignacion === 'COMODIN' ? (
                     <span className="ml-2 text-xs font-normal text-aviso">(prestada)</span>
                   ) : null}
-                </p>
-              </div>
+                </span>
+              </button>
 
               {suyas.length > 0 ? (
                 <ul className="mt-3 space-y-1">
@@ -202,9 +404,7 @@ export function GrillaFlota({ flota, alertas }: Props) {
                   type="button"
                   className="boton-tactil border border-borde bg-panelClaro text-slate-200"
                   onClick={() => {
-                    setError(null);
-                    setResultado(null);
-                    setAdvertencia(null);
+                    limpiar();
                     setCambiando(moto);
                   }}
                 >
@@ -216,15 +416,104 @@ export function GrillaFlota({ flota, alertas }: Props) {
         })}
       </div>
 
-      {cambiando ? (
-        <ModalEstado
-          moto={cambiando}
-          enProceso={enProceso}
-          alCerrar={() => setCambiando(null)}
-          alCambiar={cambiarEstado}
-        />
-      ) : null}
+      {dialogos}
     </>
+  );
+}
+
+/**
+ * Entrega de una moto a un repartidor.
+ *
+ * Solo se ofrecen los que hoy no traen nada. Quitarle la moto a otro para
+ * darsela a este se hace desde la tarjeta del otro, para que quede claro a
+ * quien se esta dejando a pie.
+ */
+function ModalAsignar({
+  moto,
+  choferes,
+  enProceso,
+  alCerrar,
+  alAsignar,
+  alLiberar,
+}: {
+  moto: MotoConAsignacion;
+  choferes: Array<{ id: string; nombre: string }>;
+  enProceso: boolean;
+  alCerrar: () => void;
+  alAsignar: (placa: string, choferId: string) => void;
+  alLiberar: (moto: MotoConAsignacion) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="tarjeta w-full max-w-lg p-6">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-wide text-slate-400">Quien trae la moto</p>
+            <h2 className="cifra text-2xl font-bold">{moto.placa}</h2>
+            <p className="mt-1 text-slate-400">
+              {moto.choferNombre ? `Hoy la trae ${moto.choferNombre}` : 'Hoy no la trae nadie'}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Cerrar"
+            className="h-12 w-12 shrink-0 rounded-full border border-borde text-2xl text-slate-400 active:scale-95"
+            onClick={alCerrar}
+            disabled={enProceso}
+          >
+            ×
+          </button>
+        </header>
+
+        {moto.choferId ? (
+          <button
+            type="button"
+            className="boton-tactil mt-5 w-full border border-alerta/50 bg-alerta/10 text-alerta"
+            disabled={enProceso}
+            onClick={() => alLiberar(moto)}
+          >
+            Quitarle la moto a {moto.choferNombre}
+          </button>
+        ) : null}
+
+        <p className="mt-5 text-xs uppercase tracking-wide text-slate-500">
+          Repartidores sin moto
+        </p>
+
+        {choferes.length === 0 ? (
+          <p className="mt-3 rounded-2xl bg-fondo p-4 text-center text-slate-400">
+            Todos los repartidores activos ya traen una moto.
+          </p>
+        ) : (
+          <div className="mt-3 grid max-h-80 gap-3 overflow-y-auto">
+            {choferes.map((chofer) => (
+              <button
+                key={chofer.id}
+                type="button"
+                className="boton-tactil border border-borde bg-panelClaro text-slate-200"
+                disabled={enProceso}
+                onClick={() => alAsignar(moto.placa, chofer.id)}
+              >
+                {chofer.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="boton-tactil mt-5 w-full border border-borde bg-panelClaro text-slate-300"
+          onClick={alCerrar}
+          disabled={enProceso}
+        >
+          {enProceso ? 'Aplicando...' : 'Cancelar'}
+        </button>
+      </div>
+    </div>
   );
 }
 

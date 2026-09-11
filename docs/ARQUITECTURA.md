@@ -366,9 +366,69 @@ suma. El formato de moneda va como formato de celda.
 
 ---
 
-## 11. Estado actual
+## 11. Flota de motocicletas
 
-Terminado y verificado con 88 comprobaciones automáticas más una prueba manual
+El módulo vive aparte del dinero: comparte los repartidores y el cajero que
+registra, pero ningún cálculo de caja depende de él.
+
+### Tres tablas
+
+`motocicletas` se identifica por la placa, no por un identificador inventado:
+la placa ya es única y es lo que la gente dice en voz alta. Se guarda
+normalizada, sin espacios ni guiones, así que «mot-555 b» y «MOT555B» son la
+misma moto.
+
+`asignaciones_moto` es un historial, no un estado. La asignación vigente es la
+que no tiene fecha de fin. Dos columnas únicas anulables impiden a nivel de
+base de datos que un repartidor traiga dos motos o que una moto la traigan
+dos personas, por el mismo mecanismo que el candado de turno abierto.
+
+`registros_mantenimiento` es la bitácora de gastos. Cada fila lleva el
+odómetro del momento, y ese número es el que gobierna las alertas.
+
+### El odómetro solo sube
+
+Registrar un gasto actualiza el kilometraje de la moto, y el servicio rechaza
+un número menor al que ya tenía. Sin esa regla, bastaría con teclear un
+kilometraje bajo para que una alerta de servicio vencido desapareciera.
+
+### Reemplazo por comodín
+
+Cuando una moto sale de circulación, su repartidor recibe la comodín. El
+requerimiento no decía qué hacer en tres casos, y los tres están resueltos y
+cubiertos por pruebas:
+
+1. **La comodín ya está prestada.** El cambio de estado no se bloquea, pero la
+   pantalla avisa con nombre y apellido que ese repartidor queda sin moto. Es
+   una decisión de la persona, no del sistema.
+2. **La moto vuelve del taller.** Se le devuelve a su dueño y la comodín queda
+   libre, lista para el siguiente.
+3. **Se avería la comodín.** No se reemplaza a sí misma; se avisa igual.
+
+### Semáforo
+
+El tablero pinta cada moto de verde, amarillo o rojo. El estado pesa más que
+el kilometraje: una moto en el taller es roja aunque le acaben de cambiar el
+aceite. El texto del estado lleva su propio color, porque decir «Operativa» en
+rojo se lee como si la moto no sirviera.
+
+Los intervalos son 2.000 km para el aceite y 10.000 km para frenos y llantas,
+con aviso al 85 %. Una moto sin ningún servicio registrado cuenta desde cero:
+está vencida, no exenta.
+
+### Costo por kilómetro
+
+Sale del rango de odómetro que cubren los propios registros del período, no
+del kilometraje total de la moto. Mezclarlos repartiría el gasto de un mes
+entre los kilómetros de toda la vida de la moto. Con un solo registro no hay
+recorrido que medir y la columna dice «sin datos», que no es lo mismo que
+cero: cero significaría que rodar no cuesta nada.
+
+---
+
+## 12. Estado actual
+
+Terminado y verificado con 185 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.
@@ -383,8 +443,17 @@ en el navegador:
 - Historial filtrable, métricas, ficha de detalle, reimpresión y exportación.
 - Respaldo verificado, restauración con red de seguridad y aviso en pantalla
   cuando la copia se atrasa.
+- Flota de motos: tablero con semáforo, préstamo automático de la comodín,
+  registro táctil de gastos y reportería con costo por kilómetro.
 
-Los cinco módulos del requerimiento están construidos.
+Los cinco módulos del requerimiento están construidos, más el de flota.
+
+### Cómo probar sin tocar la contabilidad
+
+`npm run demo` levanta la aplicación en el puerto 3100 contra el esquema de
+pruebas, con su propia carpeta de compilación para poder correr a la vez que
+el servidor de trabajo. `npm run demo:flota` le pone una flota de ejemplo.
+Sirve para enseñar el sistema o entrenar a alguien.
 
 Queda por decidir con el negocio:
 

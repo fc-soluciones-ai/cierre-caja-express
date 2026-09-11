@@ -155,6 +155,8 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
             <button
               key={m.placa}
               type="button"
+              aria-pressed={m.placa === placa}
+              aria-label={`${m.placa}, la trae ${m.choferNombre ?? 'nadie'}`}
               className={`min-h-tactil rounded-2xl border px-3 text-left transition active:scale-95 ${
                 m.placa === placa
                   ? 'border-entrada bg-entrada/15'
@@ -181,6 +183,8 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
             <button
               key={c.valor}
               type="button"
+              aria-pressed={c.valor === categoria}
+              aria-label={c.etiqueta}
               className={`flex h-24 flex-col items-center justify-center gap-1 rounded-2xl border transition active:scale-95 ${
                 c.valor === categoria
                   ? 'border-entrada bg-entrada/15 text-entrada'

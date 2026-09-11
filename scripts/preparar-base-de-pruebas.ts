@@ -8,7 +8,7 @@
 
 import { execFileSync } from 'node:child_process';
 
-import { sinClave, urlDePruebas } from './base-de-pruebas';
+import { sinClave, urlDePruebas } from './direccion-pruebas';
 import { cargarEnv } from './entorno';
 
 cargarEnv();

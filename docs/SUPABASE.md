@@ -151,3 +151,40 @@ Dos cambios lo cierran:
 
 La leccion general: en un agrupador en modo transaccion, cualquier `SET` que
 no se limpie es un efecto secundario que viaja a otros clientes.
+
+---
+
+## 9. Una trampa peor, que si borro datos
+
+Corregir la fuga del agrupador destapo un problema de fondo que esa misma fuga
+venia tapando por accidente.
+
+El envoltorio de pruebas apuntaba a la base de pruebas escribiendo
+`process.env.DATABASE_URL` antes de importar el script. Eso no funciona. El
+cliente de Prisma resuelve `env("DATABASE_URL")` releyendo el archivo `.env`
+por su cuenta, y descarta lo que le haya dejado quien lo importa.
+
+Mientras el `search_path` estaba contaminado, las pruebas terminaban en el
+esquema `pruebas` de todos modos, por la razon equivocada. Al fijar
+`schema=public` en la direccion de la aplicacion, las pruebas pasaron a correr
+contra produccion y su rutina de limpieza borro todas las tablas del negocio.
+Se restauro del respaldo del dia anterior.
+
+Dos barreras lo cierran, y son independientes a proposito:
+
+1. **La direccion de pruebas viaja en `DATABASE_URL_PRUEBAS`**, una variable
+   que Prisma no conoce y que `.env` no define. `src/lib/db/prisma.ts` se la
+   entrega al constructor en `datasources`, y lo explicito gana sobre lo que
+   Prisma vuelva a leer.
+2. **Cada script destructivo llama a `exigirBaseDePruebas()`** y se niega a
+   correr si no ve el esquema `pruebas`. Aunque el envoltorio falle, no borra.
+
+La leccion general: una biblioteca que lee su configuracion sola no obedece al
+entorno que uno le prepare. Hay que pasarle el valor a la cara, y no dar por
+sentado que lo tomo.
+
+### Probar sin miedo
+
+`npm run demo` levanta la aplicacion en el puerto 3100 contra el esquema de
+pruebas, y `npm run demo:flota` le pone una flota de ejemplo. Sirve para
+enseñar el sistema o entrenar a alguien sin tocar la contabilidad.

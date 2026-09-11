@@ -45,8 +45,12 @@ async function intentar(cajeroId: string, pin: string): Promise<string> {
 async function main(): Promise<void> {
   exigirBaseDePruebas();
 
+  await prisma.registroMantenimiento.deleteMany();
+  await prisma.asignacionMoto.deleteMany();
+  await prisma.motocicleta.deleteMany();
   await prisma.sesion.deleteMany();
   await prisma.eventoAuditoria.deleteMany();
+  await prisma.chofer.deleteMany();
   await prisma.cajero.deleteMany();
 
   const PIN = '7392';
