@@ -1,0 +1,326 @@
+// =============================================================================
+//  Cierre Caja Express - Esquema de datos
+// =============================================================================
+//  CONVENCIONES OBLIGATORIAS
+//
+//  1. DINERO: todos los montos son enteros en la UNIDAD MENOR de la moneda
+//     (centimos). CRC tiene exponente ISO 4217 = 2, por lo tanto
+//     1.000,00 colones se almacena como 100000. Nunca usar Float/Double:
+//     el redondeo binario corrompe arqueos de caja.
+//     Ver src/lib/money/money.ts para las conversiones.
+//
+//  2. NO SE GUARDAN SALDOS ACUMULADOS. El saldo de abonos de un chofer y el
+//     total de efectivo en caja son SUMAS derivadas. Guardar el acumulado
+//     crearia dos fuentes de verdad que se desincronizan ante una correccion.
+//
+//  3. Los enums se declaran como String porque SQLite no soporta enums en
+//     Prisma. Los valores validos viven en src/types/enums.ts y se validan
+//     con Zod en la capa de servicio. Migrar a PostgreSQL no exige tocar los
+//     datos, solo el bloque datasource.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Personas
+// -----------------------------------------------------------------------------
+
+/// Operador de la caja. Toda escritura de dinero queda firmada por un cajero.
+model Cajero {
+  id        String   @id @default(cuid())
+  nombre    String
+  pin       String // hash del PIN de 4-6 digitos, nunca el PIN en claro
+  rol       String   @default("CAJERO") // CAJERO | SUPERVISOR | ADMIN
+  estado    String   @default("ACTIVO") // ACTIVO | INACTIVO
+  createdAt DateTime @default(now()) @map("created_at")
+
+  abonos      AbonoEfectivo[]
+  cargasExcel CargaExcel[]
+  cierres     CierreChofer[]
+  arqueos     ArqueoCaja[]
+  eventos     EventoAuditoria[]
+
+  @@map("cajeros")
+}
+
+/// Repartidor. idMeseroSoftRestaurant es la llave de cruce con los Excel.
+model Chofer {
+  id                     String @id @default(cuid())
+  idMeseroSoftRestaurant String @unique @map("id_mesero_softrestaurant")
+  nombre                 String
+
+  /// Nombre sin acentos y en mayusculas. Sirve para cruzar archivos que no
+  /// traen idmesero. Se recalcula en cada escritura, no se edita a mano.
+  nombreNormalizado String   @map("nombre_normalizado")
+  fotoUrl           String?  @map("foto_url")
+  telefono          String?
+  estado            String   @default("ACTIVO") // ACTIVO | INACTIVO
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  turnos      TurnoChofer[]
+  ventasExcel VentaChoferExcel[]
+
+  @@index([nombreNormalizado])
+  @@index([estado])
+  @@map("choferes")
+}
+
+// -----------------------------------------------------------------------------
+// Operacion del turno
+// -----------------------------------------------------------------------------
+
+/// Un turno por chofer por jornada. Los abonos y el cierre cuelgan de aqui.
+model TurnoChofer {
+  id            String    @id @default(cuid())
+  choferId      String    @map("chofer_id")
+  fechaApertura DateTime  @default(now()) @map("fecha_apertura")
+  fechaCierre   DateTime? @map("fecha_cierre")
+  estado        String    @default("ABIERTO") // ABIERTO | CERRADO
+
+  /// Candado de integridad: vale choferId mientras el turno esta ABIERTO y
+  /// NULL cuando se cierra. Como los NULL no colisionan en un indice unico,
+  /// la base de datos garantiza un solo turno abierto por chofer, aunque dos
+  /// cajas toquen al mismo chofer en el mismo instante.
+  candadoTurnoAbierto String? @unique @map("candado_turno_abierto")
+
+  chofer Chofer          @relation(fields: [choferId], references: [id], onDelete: Restrict)
+  abonos AbonoEfectivo[]
+  cierre CierreChofer?
+
+  @@index([choferId, estado])
+  @@index([fechaApertura])
+  @@map("turnos_chofer")
+}
+
+/// Entrega parcial de efectivo del chofer a la caja durante el turno.
+model AbonoEfectivo {
+  id            String @id @default(cuid())
+  turnoChoferId String @map("turno_chofer_id")
+
+  /// Centimos. Positivo en un abono normal; NEGATIVO en la fila de reverso
+  /// que anula a otra. Asi el saldo del chofer sigue siendo un SUM simple y
+  /// nunca hay que editar ni borrar una fila de dinero.
+  montoAbonado Int      @map("monto_abonado")
+  timestamp    DateTime @default(now())
+  cajeroId     String   @map("cajero_id")
+  dispositivo  String? // punto de caja que registro el abono
+  nota         String?
+
+  /// Llave de idempotencia generada por el cliente con crypto.randomUUID().
+  /// En una pantalla tactil el doble toque es constante: sin esta llave, dos
+  /// envios del mismo abono crean dos movimientos de dinero distintos.
+  claveIdempotencia String? @unique @map("clave_idempotencia")
+
+  anuladoPorId String?        @unique @map("anulado_por_id")
+  anuladoPor   AbonoEfectivo? @relation("AnulacionAbono", fields: [anuladoPorId], references: [id])
+  anula        AbonoEfectivo? @relation("AnulacionAbono")
+
+  turno    TurnoChofer @relation(fields: [turnoChoferId], references: [id], onDelete: Restrict)
+  cajero   Cajero      @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  tiquetes Tiquete[]
+
+  @@index([turnoChoferId])
+  @@index([timestamp])
+  @@map("abonos_efectivo")
+}
+
+// -----------------------------------------------------------------------------
+// Ingesta de reportes de Soft Restaurant
+// -----------------------------------------------------------------------------
+
+/// Un archivo Excel importado. hashArchivo (SHA-256 del binario) es unico para
+/// que el mismo archivo no se pueda cargar dos veces por error.
+model CargaExcel {
+  id               String   @id @default(cuid())
+  timestamp        DateTime @default(now())
+  tipoCorte        String   @map("tipo_corte") // PARCIAL | TOTAL
+  tipoReporte      String   @map("tipo_reporte") // BLANCO | NEGRO
+  formatoDetectado String   @map("formato_detectado") // DETALLADO | CONSOLIDADO
+  hashArchivo      String   @unique @map("hash_archivo")
+  nombreArchivo    String   @map("nombre_archivo")
+  cajeroId         String   @map("cajero_id")
+
+  /// Dia operativo (yyyy-mm-dd) al que se imputa el archivo, para consolidar
+  /// turnos que cruzan la medianoche.
+  diaOperativo   String @map("dia_operativo")
+  filasLeidas    Int    @map("filas_leidas")
+  filasIgnoradas Int    @map("filas_ignoradas")
+
+  cajero  Cajero             @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  ventas  VentaChoferExcel[]
+  cierres CierreChofer[]
+
+  @@index([diaOperativo])
+  @@index([timestamp])
+  @@map("cargas_excel")
+}
+
+/// Totales por chofer extraidos de UNA carga. Es el detalle normalizado que
+/// permite consolidar Blanco + Negro + cortes parciales sin releer archivos.
+model VentaChoferExcel {
+  id           String @id @default(cuid())
+  cargaExcelId String @map("carga_excel_id")
+
+  /// Null si el Excel trae un mesero que aun no existe como chofer. Queda
+  /// pendiente de vincular y visible en la pantalla de carga.
+  choferId      String? @map("chofer_id")
+  idMeseroExcel String  @map("id_mesero_excel")
+  nombreExcel   String  @map("nombre_excel")
+
+  efectivo     Int // centimos
+  tarjeta      Int // centimos
+  sinpe        Int // centimos, columna "otros" del reporte
+  importeTotal Int @map("importe_total") // centimos
+  viajes       Int // numcheque contados (detallado) o nopersonas (consolidado)
+
+  carga  CargaExcel @relation(fields: [cargaExcelId], references: [id], onDelete: Cascade)
+  chofer Chofer?    @relation(fields: [choferId], references: [id], onDelete: SetNull)
+
+  @@unique([cargaExcelId, idMeseroExcel])
+  @@index([choferId])
+  @@map("ventas_chofer_excel")
+}
+
+// -----------------------------------------------------------------------------
+// Cierre y conciliacion
+// -----------------------------------------------------------------------------
+
+/// Conciliacion final de un turno contra el Excel. Registro inmutable.
+model CierreChofer {
+  id            String @id @default(cuid())
+  turnoChoferId String @unique @map("turno_chofer_id")
+
+  /// Carga principal usada. Si se consolidaron varias, las demas quedan en
+  /// cargasConsolidadas (JSON con los ids) para reconstruir el calculo.
+  ///
+  /// Es NULA en un cierre forzado sin Excel: a veces hay que liquidar a un
+  /// repartidor antes de que el reporte del POS este disponible, y negar ese
+  /// caso solo lograria que el cierre se hiciera fuera del sistema.
+  cargaExcelId       String? @map("carga_excel_id")
+  cargasConsolidadas String  @default("[]") @map("cargas_consolidadas")
+
+  // --- Esperado segun Excel (snapshot en centimos al momento del cierre) ---
+  efectivoEsperado Int @map("efectivo_esperado")
+  tarjetaEsperada  Int @map("tarjeta_esperada")
+  sinpeEsperado    Int @map("sinpe_esperado")
+  viajesTotales    Int @map("viajes_totales")
+
+  // --- Recibido en caja (centimos) ---
+  /// Suma de abonos parciales del turno, congelada al cerrar.
+  abonosParciales Int @map("abonos_parciales")
+
+  /// Efectivo entregado en el acto del cierre.
+  efectivoEntregado Int @map("efectivo_entregado")
+
+  /// (abonosParciales + efectivoEntregado) - efectivoEsperado
+  /// Positivo = SOBRANTE, negativo = FALTANTE.
+  diferencia Int
+
+  timestampCierre DateTime @default(now()) @map("timestamp_cierre")
+  cajeroId        String   @map("cajero_id")
+  arqueoCajaId    String?  @map("arqueo_caja_id")
+  observacion     String?
+
+  turno    TurnoChofer @relation(fields: [turnoChoferId], references: [id], onDelete: Restrict)
+  carga    CargaExcel? @relation(fields: [cargaExcelId], references: [id], onDelete: Restrict)
+  cajero   Cajero      @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  arqueo   ArqueoCaja? @relation(fields: [arqueoCajaId], references: [id])
+  tiquetes Tiquete[]
+
+  @@index([timestampCierre])
+  @@index([cajeroId])
+  @@map("cierres_chofer")
+}
+
+/// Conteo fisico de la caja. Se pide antes de confirmar un cierre grupal.
+model ArqueoCaja {
+  id       String @id @default(cuid())
+  cajeroId String @map("cajero_id")
+
+  /// Lo que el sistema dice que deberia haber (centimos).
+  efectivoTeoricoCaja Int @map("efectivo_teorico_caja")
+
+  /// Lo que el cajero conto a mano (centimos).
+  efectivoRealContado Int @map("efectivo_real_contado")
+
+  /// real - teorico. Positivo = SOBRANTE, negativo = FALTANTE.
+  diferenciaCaja         Int      @map("diferencia_caja")
+  desgloseDenominaciones String?  @map("desglose_denominaciones") // JSON opcional
+  observacion            String?
+  timestamp              DateTime @default(now())
+
+  /// Misma proteccion contra doble toque que en los abonos.
+  claveIdempotencia String? @unique @map("clave_idempotencia")
+
+  cajero   Cajero         @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  cierres  CierreChofer[]
+  tiquetes Tiquete[]
+
+  @@index([timestamp])
+  @@map("arqueos_caja")
+}
+
+// -----------------------------------------------------------------------------
+// Impresion y auditoria
+// -----------------------------------------------------------------------------
+
+/// Documento del tiquete ya congelado, en JSON (ver src/lib/print/documento.ts).
+/// Se guarda el documento y no los bytes ESC/POS para poder previsualizarlo en
+/// pantalla, y no los datos de origen para que una reimpresion salga identica
+/// al original aunque la plantilla cambie despues.
+model Tiquete {
+  id              String   @id @default(cuid())
+  tipo            String // ABONO | CIERRE_CHOFER | ARQUEO | CIERRE_GRUPAL
+  contenidoTexto  String   @map("contenido_texto")
+  estadoImpresion String   @default("PENDIENTE") @map("estado_impresion") // PENDIENTE | IMPRESO | ERROR
+  intentos        Int      @default(0)
+  ultimoError     String?  @map("ultimo_error")
+  copias          Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  abonoId        String? @map("abono_id")
+  cierreChoferId String? @map("cierre_chofer_id")
+  arqueoCajaId   String? @map("arqueo_caja_id")
+
+  abono  AbonoEfectivo? @relation(fields: [abonoId], references: [id], onDelete: Cascade)
+  cierre CierreChofer?  @relation(fields: [cierreChoferId], references: [id], onDelete: Cascade)
+  arqueo ArqueoCaja?    @relation(fields: [arqueoCajaId], references: [id], onDelete: Cascade)
+
+  @@index([tipo, createdAt])
+  @@index([estadoImpresion])
+  @@map("tiquetes")
+}
+
+/// Bitacora append-only. Nunca se actualiza ni se borra: es la fuente de la
+/// pantalla de Historial y Auditoria.
+model EventoAuditoria {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  tipo      String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | RESPALDO
+  cajeroId    String? @map("cajero_id")
+  choferId    String? @map("chofer_id")
+  entidadTipo String? @map("entidad_tipo")
+  entidadId   String? @map("entidad_id")
+
+  /// Monto involucrado en centimos, si aplica. Evita joins en reporteria.
+  monto Int?
+
+  /// Detalle en JSON. Nunca debe contener PIN, hash ni datos sensibles.
+  detalle     String?
+  dispositivo String?
+
+  cajero Cajero? @relation(fields: [cajeroId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([tipo, timestamp])
+  @@index([choferId, timestamp])
+  @@map("eventos_auditoria")
+}

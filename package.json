@@ -1,0 +1,48 @@
+{
+  "name": "cierre-caja-express",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gestion de efectivo, abonos parciales y cierres de turno para repartidores express",
+  "scripts": {
+    "dev": "next dev",
+    "dev:red": "next dev -H 0.0.0.0",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed/seed.ts",
+    "test:parser": "tsx scripts/verificar-parser.ts",
+    "typecheck": "tsc --noEmit",
+    "test:esquema": "tsx scripts/verificar-esquema.ts",
+    "test": "npm run test:parser && npm run test:esquema && npm run test:servicios && npm run test:respaldo",
+    "test:servicios": "cross-env DATABASE_URL=file:./prueba.db IMPRESORA_MODO=NONE tsx scripts/verificar-servicios.ts",
+    "db:push:prueba": "cross-env DATABASE_URL=file:./prueba.db prisma db push --skip-generate",
+    "print:probar": "tsx scripts/probar-impresora.ts",
+    "db:limpiar": "tsx scripts/limpiar-movimientos.ts",
+    "db:respaldar": "tsx scripts/respaldar.ts",
+    "db:restaurar": "tsx scripts/restaurar.ts",
+    "test:respaldo": "cross-env DATABASE_URL=file:./respaldo-prueba.db RESPALDO_DIRECTORIO=./storage/respaldos-prueba tsx scripts/verificar-respaldo.ts",
+    "db:repartidores": "tsx scripts/cargar-repartidores.ts",
+    "ejemplos": "tsx scripts/generar-ejemplos.ts",
+    "demo": "tsx scripts/preparar-demo.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@types/react": "^18.3.11",
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
+    "postcss": "^8.4.47",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.13",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

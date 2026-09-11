@@ -1,0 +1,28 @@
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Respaldos: contienen datos reales del negocio
+respaldos/
+
+# Base de datos local
+prisma/*.db
+prisma/*.db-journal
+prisma/dev.db*
+
+# Archivos Excel subidos por el operador
+storage/
+public/choferes/*
+!public/choferes/.gitkeep
+
+# SO
+Thumbs.db
+Desktop.ini

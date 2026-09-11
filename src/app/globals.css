@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* El operador nunca hace zoom con los dedos sobre una caja registradora:
+       un pellizco accidental dejaria la pantalla inservible a media noche. */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-fondo text-slate-100 antialiased;
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+  }
+
+  /* Sin seleccion de texto ni menu contextual por pulsacion larga: en tactil
+     solo produce selecciones azules accidentales al arrastrar el dedo. */
+  button,
+  [role='button'] {
+    @apply select-none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Barra de desplazamiento visible con el dedo. */
+  ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-borde;
+  }
+}
+
+@layer components {
+  .boton-tactil {
+    @apply flex min-h-tactil items-center justify-center gap-2 rounded-2xl px-6
+           text-lg font-semibold transition active:scale-[0.97];
+  }
+
+  .tarjeta {
+    @apply rounded-3xl border border-borde bg-panel shadow-lg shadow-black/30;
+  }
+
+  /* Las cifras de dinero se leen en columna: sin numeros tabulares, los
+     miles bailan de una tarjeta a otra. */
+  .cifra {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Impresion en papel A4, para el boton de guardar el reporte en PDF.
+   La pantalla es oscura porque se opera de noche; imprimirla asi gastaria
+   un cartucho por reporte. */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .tarjeta {
+    border-color: #cbd5e1 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-slate-400,
+  .text-slate-500 {
+    color: #1e293b !important;
+  }
+
+  /* Los faltantes siguen destacando en gris oscuro sin depender del color. */
+  .text-alerta,
+  .text-aviso,
+  .text-entrada {
+    color: #000 !important;
+    font-weight: 700;
+  }
+
+  table {
+    font-size: 11px;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}
