@@ -43,6 +43,20 @@ const TABLAS_VERIFICADAS = [
   'eventos_auditoria',
 ] as const;
 
+/** Nombre de tabla en la base -> clave del respaldo logico en JSON. */
+const CLAVE_POR_TABLA: Record<string, string> = {
+  cajeros: 'cajeros',
+  choferes: 'choferes',
+  turnos_chofer: 'turnos',
+  abonos_efectivo: 'abonos',
+  cargas_excel: 'cargasExcel',
+  ventas_chofer_excel: 'ventasChoferExcel',
+  cierres_chofer: 'cierres',
+  arqueos_caja: 'arqueos',
+  tiquetes: 'tiquetes',
+  eventos_auditoria: 'eventos',
+};
+
 export interface ManifiestoRespaldo {
   archivo: string;
   creado: string;
@@ -72,6 +86,18 @@ export interface ResultadoRespaldo {
  * el directorio de trabajo. Replicarlo aqui evita respaldar un archivo que no
  * es el que la aplicacion esta usando.
  */
+/**
+ * Si el respaldo de este repositorio aplica al motor en uso.
+ *
+ * VACUUM INTO es de SQLite. Con PostgreSQL los respaldos son del proveedor, y
+ * la aplicacion no debe fingir que los controla: avisar de "el ultimo respaldo
+ * tiene N horas" sobre un mecanismo apagado es peor que no avisar, porque el
+ * operador aprende a ignorar el aviso.
+ */
+export function respaldoLocalAplica(): boolean {
+  return (process.env.DATABASE_URL ?? '').startsWith('file:');
+}
+
 export function rutaBaseSqlite(): string {
   const url = process.env.DATABASE_URL ?? '';
   if (!url.startsWith('file:')) {
@@ -197,10 +223,116 @@ export interface OpcionesRespaldo {
   sinRotacion?: boolean;
 }
 
+/**
+ * Respaldo logico, para cuando la base no es un archivo.
+ *
+ * Vuelca todas las tablas a JSON. No es una copia binaria y no reproduce
+ * indices ni permisos, pero si todos los datos del negocio, que es lo que no
+ * se puede reconstruir. Se verifica releyendo el archivo escrito y contando
+ * sus filas contra las de la base.
+ *
+ * Existe porque al mudar a un proveedor la aplicacion deja de controlar los
+ * respaldos, y el plan gratuito de Supabase no incluye copias automaticas.
+ * Quedarse sin ninguna y no enterarse es exactamente el escenario que este
+ * archivo entero trata de evitar.
+ */
+async function crearRespaldoLogico(
+  opciones: OpcionesRespaldo,
+  inicio: number,
+): Promise<ResultadoRespaldo> {
+  const directorio = directorioRespaldos();
+  await mkdir(directorio, { recursive: true });
+
+  const sufijo = opciones.etiqueta ? `-${opciones.etiqueta.replace(/[^a-z0-9_-]/gi, '')}` : '';
+  const nombre = `caja-${marcaDeTiempo()}${sufijo}.json`;
+  const destino = path.join(directorio, nombre);
+
+  // El orden es el de las llaves foraneas, para que restaurar sea posible.
+  const contenido = {
+    formato: 'respaldo-logico-v1',
+    creado: new Date().toISOString(),
+    motor: 'postgresql',
+    cajeros: await prisma.cajero.findMany(),
+    choferes: await prisma.chofer.findMany(),
+    cargasExcel: await prisma.cargaExcel.findMany(),
+    turnos: await prisma.turnoChofer.findMany(),
+    abonos: await prisma.abonoEfectivo.findMany(),
+    ventasChoferExcel: await prisma.ventaChoferExcel.findMany(),
+    arqueos: await prisma.arqueoCaja.findMany(),
+    cierres: await prisma.cierreChofer.findMany(),
+    tiquetes: await prisma.tiquete.findMany(),
+    eventos: await prisma.eventoAuditoria.findMany(),
+    // Las sesiones no se respaldan: son credenciales vivas y caducan solas.
+  };
+
+  await writeFile(destino, JSON.stringify(contenido, null, 2), 'utf8');
+
+  // Verificacion: se relee lo escrito y se cuentan sus filas. Un archivo que
+  // nadie abrio hasta el dia del desastre no es un respaldo.
+  const releido = JSON.parse(await readFile(destino, 'utf8')) as Record<string, unknown>;
+  const conteos: Record<string, number> = {};
+  for (const tabla of TABLAS_VERIFICADAS) {
+    const clave = CLAVE_POR_TABLA[tabla];
+    conteos[tabla] = clave ? ((releido[clave] as unknown[]) ?? []).length : 0;
+  }
+
+  const faltantes = Object.entries(conteos).filter(([tabla, n]) => {
+    const clave = CLAVE_POR_TABLA[tabla];
+    if (!clave) return false;
+    return n !== ((contenido as Record<string, unknown>)[clave] as unknown[]).length;
+  });
+  if (faltantes.length > 0) {
+    await unlink(destino).catch(() => undefined);
+    throw new ErrorNegocio(
+      'DATOS_INVALIDOS',
+      `La copia no se releyo completa en: ${faltantes.map(([t]) => t).join(', ')}. Se descarto.`,
+    );
+  }
+
+  const info = await stat(destino);
+  const manifiesto: ManifiestoRespaldo = {
+    archivo: nombre,
+    creado: contenido.creado,
+    bytes: info.size,
+    sha256: await sha256DeArchivo(destino),
+    origen: 'postgresql',
+    conteos,
+    integridad: 'ok',
+  };
+  await writeFile(`${destino}.json`, JSON.stringify(manifiesto, null, 2), 'utf8');
+
+  const eliminados = opciones.sinRotacion ? [] : await rotarRespaldos();
+
+  await prisma
+    .$transaction(async (tx) => {
+      await registrarEvento(tx, {
+        tipo: 'RESPALDO',
+        cajeroId: opciones.cajeroId ?? null,
+        entidadTipo: 'Respaldo',
+        entidadId: nombre,
+        detalle: {
+          tipo: 'LOGICO',
+          bytes: manifiesto.bytes,
+          filas: Object.values(conteos).reduce((a, b) => a + b, 0),
+        },
+      });
+    })
+    .catch((e) => console.error('[respaldo] no se pudo registrar el evento:', e));
+
+  return { ruta: destino, manifiesto, duracionMs: Date.now() - inicio, eliminados };
+}
+
 export async function crearRespaldo(
   opciones: OpcionesRespaldo = {},
 ): Promise<ResultadoRespaldo> {
   const inicio = Date.now();
+
+  // Con la base en un proveedor no hay archivo que copiar, pero los datos
+  // siguen siendo del negocio y alguien tiene que guardarlos.
+  if (!respaldoLocalAplica()) {
+    return crearRespaldoLogico(opciones, inicio);
+  }
+
   const origen = rutaBaseSqlite();
   const directorio = directorioRespaldos();
   await mkdir(directorio, { recursive: true });
@@ -291,7 +423,13 @@ export async function listarRespaldos(): Promise<InfoRespaldo[]> {
   }
 
   const copias: InfoRespaldo[] = [];
-  for (const nombre of nombres.filter((n) => n.endsWith('.db'))) {
+  // Un manifiesto es un .json que acompana a otro archivo; el respaldo logico
+  // tambien es .json. Se distinguen porque el manifiesto termina en .db.json
+  // o .json.json.
+  const esRespaldo = (n: string) =>
+    (n.endsWith('.db') || n.endsWith('.json')) && !n.endsWith('.db.json') && !n.endsWith('.json.json');
+
+  for (const nombre of nombres.filter(esRespaldo)) {
     const ruta = path.join(directorio, nombre);
     const info = await stat(ruta);
     let manifiesto: ManifiestoRespaldo | null = null;

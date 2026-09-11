@@ -6,11 +6,23 @@
 
 import { prisma } from '@/lib/db/prisma';
 
+/**
+ * Lista las tablas sin depender del motor.
+ *
+ * Cada base guarda su catalogo en un lugar distinto, y esta comprobacion tiene
+ * que seguir sirviendo tanto en la caja local con SQLite como en Supabase.
+ */
+async function listarTablas(): Promise<string[]> {
+  const esSqlite = (process.env.DATABASE_URL ?? '').startsWith('file:');
+  const consulta = esSqlite
+    ? "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%' ORDER BY name"
+    : "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name NOT LIKE '_prisma%' ORDER BY table_name";
+  const filas = await prisma.$queryRawUnsafe<Array<{ name: string }>>(consulta);
+  return filas.map((f) => f.name);
+}
+
 async function main(): Promise<void> {
-  const tablas = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_prisma%' ORDER BY name",
-  );
-  console.log('Tablas creadas:', tablas.map((t) => t.name).join(', '));
+  console.log('Tablas creadas:', (await listarTablas()).join(', '));
 
   const cajero = await prisma.cajero.create({
     data: { nombre: 'Caja de prueba', pin: 'hash-de-prueba' },

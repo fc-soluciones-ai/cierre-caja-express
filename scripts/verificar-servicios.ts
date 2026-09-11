@@ -33,8 +33,26 @@ import {
 
 let fallos = 0;
 
+/**
+ * Ordena las claves de los objetos antes de comparar.
+ *
+ * Dos motores devuelven un groupBy en distinto orden, y comparar el JSON tal
+ * cual haria fallar la prueba por algo que no le importa a nadie.
+ */
+function normalizar(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(normalizar);
+  if (valor !== null && typeof valor === 'object') {
+    return Object.fromEntries(
+      Object.entries(valor as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([clave, v]) => [clave, normalizar(v)]),
+    );
+  }
+  return valor;
+}
+
 function comprobar(descripcion: string, real: unknown, esperado: unknown): void {
-  const ok = JSON.stringify(real) === JSON.stringify(esperado);
+  const ok = JSON.stringify(normalizar(real)) === JSON.stringify(normalizar(esperado));
   if (!ok) fallos += 1;
   console.log(`${ok ? 'OK  ' : 'FALLA'} ${descripcion}`);
   if (!ok) {

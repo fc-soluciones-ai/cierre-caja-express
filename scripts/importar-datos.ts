@@ -1,10 +1,12 @@
 /**
- * Mete en la base nueva los datos que dejo exportar-datos.ts.
+ * Mete en la base los datos de un volcado JSON.
  *
- *   npm run datos:importar                (muestra que haria)
+ *   npm run datos:importar                                    (muestra que haria)
  *   npm run datos:importar -- --aplicar
+ *   npm run datos:importar -- --archivo respaldos/caja-....json --aplicar
  *
- * Se ejecuta DESPUES de cambiar el esquema a PostgreSQL y crear las tablas.
+ * Sirve para dos cosas con el mismo formato: mudar de motor (su pareja es
+ * exportar-datos.ts) y restaurar un respaldo logico de PostgreSQL.
  *
  * Se niega a correr si la base de destino ya tiene datos. Importar sobre una
  * base con movimientos mezclaria dos historias contables, y eso no se deshace.
@@ -13,10 +15,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { cargarEnv } from './entorno';
 import { prisma } from '../src/lib/db/prisma';
 
-const ORIGEN = path.resolve(process.cwd(), 'storage', 'traslado', 'datos.json');
-const APLICAR = process.argv.includes('--aplicar');
+const POR_DEFECTO = path.resolve(process.cwd(), 'storage', 'traslado', 'datos.json');
 
 /** Las fechas viajan como texto en JSON; Prisma las quiere como Date. */
 const CAMPOS_FECHA = new Set([
@@ -34,28 +36,42 @@ function revivirFechas<T extends Record<string, unknown>>(fila: T): T {
   return salida as T;
 }
 
-async function main(): Promise<void> {
-  const crudo = await readFile(ORIGEN, 'utf8').catch(() => {
-    throw new Error(`No se encontro ${ORIGEN}. Ejecute primero: npm run datos:exportar`);
+export interface ResultadoImportacion {
+  archivo: string;
+  totales: Record<string, number>;
+}
+
+/**
+ * Carga un volcado en la base a la que apunte DATABASE_URL.
+ *
+ * El orden de las tablas respeta las llaves foraneas: cada una va despues de
+ * aquellas de las que depende.
+ */
+export async function importarDesdeArchivo(
+  ruta: string,
+  opciones: { aplicar: boolean; silencioso?: boolean } = { aplicar: false },
+): Promise<ResultadoImportacion> {
+  const crudo = await readFile(ruta, 'utf8').catch(() => {
+    throw new Error(`No se encontro ${ruta}.`);
   });
   const datos = JSON.parse(crudo) as Record<string, unknown>;
+  const registrar = (t: string) => {
+    if (!opciones.silencioso) console.log(t);
+  };
 
-  const destino = process.env.DATABASE_URL ?? '';
-  console.log(`Origen:  ${datos['origen']} (exportado ${datos['generado']})`);
-  console.log(`Destino: ${destino.replace(/:[^:@/]+@/, ':****@')}\n`);
-
-  const yaHay =
-    (await prisma.cajero.count()) +
-    (await prisma.chofer.count()) +
-    (await prisma.abonoEfectivo.count());
-  if (yaHay > 0 && APLICAR) {
-    throw new Error(
-      `La base de destino ya tiene ${yaHay} registro(s). Importar encima mezclaria dos historias. ` +
-        'Vacie la base de destino a conciencia si de verdad quiere reimportar.',
-    );
+  if (opciones.aplicar) {
+    const yaHay =
+      (await prisma.cajero.count()) +
+      (await prisma.chofer.count()) +
+      (await prisma.abonoEfectivo.count());
+    if (yaHay > 0) {
+      throw new Error(
+        `La base de destino ya tiene ${yaHay} registro(s). Importar encima mezclaria dos ` +
+          'historias contables. Vacie el destino a conciencia si de verdad quiere reimportar.',
+      );
+    }
   }
 
-  // El orden respeta las llaves foraneas: primero de quien dependen los demas.
   const plan: Array<[string, string, (filas: never[]) => Promise<unknown>]> = [
     ['cajeros', 'cajeros', (f) => prisma.cajero.createMany({ data: f })],
     ['choferes', 'choferes', (f) => prisma.chofer.createMany({ data: f })],
@@ -71,22 +87,39 @@ async function main(): Promise<void> {
     // volver a entrar con el PIN. Trasladarlas solo alargaria su vida util.
   ];
 
+  const totales: Record<string, number> = {};
   for (const [clave, etiqueta, insertar] of plan) {
     const filas = ((datos[clave] as unknown[]) ?? []).map((f) =>
       revivirFechas(f as Record<string, unknown>),
     );
-    console.log(`  ${etiqueta.padEnd(22)} ${String(filas.length).padStart(5)} fila(s)`);
-    if (APLICAR && filas.length > 0) {
+    totales[clave] = filas.length;
+    registrar(`  ${etiqueta.padEnd(22)} ${String(filas.length).padStart(5)} fila(s)`);
+    if (opciones.aplicar && filas.length > 0) {
       await insertar(filas as never[]);
     }
   }
 
-  const sesiones = ((datos['sesiones'] as unknown[]) ?? []).length;
-  if (sesiones > 0) {
-    console.log(`\n  ${sesiones} sesion(es) abiertas NO se trasladan. Vuelva a entrar con su PIN.`);
-  }
+  return { archivo: ruta, totales };
+}
 
-  if (!APLICAR) {
+function argumento(nombre: string): string | undefined {
+  const i = process.argv.indexOf(`--${nombre}`);
+  return i === -1 ? undefined : process.argv[i + 1];
+}
+
+cargarEnv();
+
+async function main(): Promise<void> {
+  const aplicar = process.argv.includes('--aplicar');
+  const ruta = path.resolve(argumento('archivo') ?? POR_DEFECTO);
+  const destino = process.env.DATABASE_URL ?? '';
+
+  console.log(`Archivo: ${ruta}`);
+  console.log(`Destino: ${destino.replace(/:[^:@/]+@/, ':****@')}\n`);
+
+  await importarDesdeArchivo(ruta, { aplicar });
+
+  if (!aplicar) {
     console.log('\nNo se escribio nada. Repita con --aplicar.');
     return;
   }
@@ -99,9 +132,12 @@ async function main(): Promise<void> {
   console.log(`  eventos:   ${await prisma.eventoAuditoria.count()}`);
 }
 
-main()
-  .catch((e) => {
-    console.error(`\nFALLO: ${e instanceof Error ? e.message : String(e)}`);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Solo corre como programa si lo invocaron directamente, no al importarlo.
+if (process.argv[1] && path.resolve(process.argv[1]).includes('importar-datos')) {
+  main()
+    .catch((e) => {
+      console.error(`\nFALLO: ${e instanceof Error ? e.message : String(e)}`);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

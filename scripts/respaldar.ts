@@ -12,12 +12,14 @@
 
 import path from 'node:path';
 
+import { cargarEnv } from './entorno';
 import { prisma } from '../src/lib/db/prisma';
 import { esErrorNegocio } from '../src/server/errores';
 import {
   crearRespaldo,
   directorioRespaldos,
   listarRespaldos,
+  respaldoLocalAplica,
   rutaBaseSqlite,
   verificarArchivoRespaldo,
 } from '../src/server/services/respaldo';
@@ -52,6 +54,8 @@ async function listar(): Promise<void> {
   }
 }
 
+cargarEnv();
+
 async function main(): Promise<void> {
   if (process.argv.includes('--listar')) {
     await listar();
@@ -75,7 +79,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(`Base de origen: ${rutaBaseSqlite()}`);
+  console.log(
+    respaldoLocalAplica()
+      ? `Base de origen: ${rutaBaseSqlite()} (copia binaria)`
+      : 'Base de origen: PostgreSQL (respaldo logico en JSON)',
+  );
   const resultado = await crearRespaldo({ etiqueta: argumento('etiqueta') });
 
   console.log(`\nRespaldo creado y verificado en ${resultado.duracionMs} ms`);

@@ -30,7 +30,24 @@ mismo mostrador.
 
 ---
 
-## 2. Por qué no se copia el archivo y ya
+## 2. Dos modos, según el motor
+
+| Motor | Qué hace | Archivo |
+|---|---|---|
+| SQLite | Copia binaria con `VACUUM INTO` | `.db` |
+| PostgreSQL | Volcado lógico de todas las tablas | `.json` |
+
+El mismo comando sirve para los dos y elige solo. El volcado lógico existe
+porque al mudar a un proveedor la aplicación deja de controlar los respaldos, y
+el plan gratuito de Supabase no incluye copias automáticas. Quedarse sin
+ninguna y no enterarse es justo lo que este documento trata de evitar.
+
+El volcado no reproduce índices ni permisos, solo los datos. Es lo que no se
+puede reconstruir: el esquema sale del repositorio con `prisma migrate`.
+
+---
+
+## 3. Por qué no se copia el archivo y ya
 
 Copiar `dev.db` con el sistema en marcha puede producir una copia rota. Si la
 copia empieza a la mitad de una transacción, el archivo resultante mezcla
@@ -51,7 +68,7 @@ el que dice ser.
 
 ---
 
-## 3. Uso diario
+## 4. Uso diario
 
 ```bash
 npm run db:respaldar
@@ -74,7 +91,7 @@ borraría el último respaldo que queda. Ambos números se ajustan en `.env`.
 
 ---
 
-## 4. Tarea programada en Windows
+## 5. Tarea programada en Windows
 
 Abra una consola **como administrador** en la carpeta del proyecto y ejecute:
 
@@ -95,7 +112,7 @@ schtasks /query /tn "Respaldo Cierre Caja Express" /v /fo list
 
 ---
 
-## 5. El dashboard avisa
+## 6. El dashboard avisa
 
 Si el último respaldo tiene más de 36 horas, o si no hay ninguno, aparece un
 aviso ámbar en el encabezado del dashboard.
@@ -107,7 +124,7 @@ día que necesita restaurar. Para entonces ya perdió meses.
 
 ---
 
-## 6. Restaurar
+## 7. Restaurar
 
 **Detenga la aplicación antes de restaurar.** Si el servidor sigue corriendo,
 tiene la base abierta y va a escribir encima de lo que se acaba de restaurar.
@@ -134,7 +151,7 @@ npm run test:esquema
 
 ---
 
-## 7. Probar que todo esto funciona
+## 8. Probar que todo esto funciona
 
 ```bash
 npm run test:respaldo
@@ -150,8 +167,9 @@ suposición, no un plan.
 
 ---
 
-## 8. Si migran a PostgreSQL
+## 9. Nota sobre PostgreSQL
 
-Nada de esto aplica: no hay un archivo que copiar. El comando lo detecta y
-falla con un mensaje claro. En ese caso el respaldo se hace con `pg_dump` y
-conviene reescribir este documento.
+El volcado lógico no sustituye a los respaldos del proveedor, los complementa.
+Revise en el panel de Supabase qué plan tiene y cada cuánto toma copias. El
+volcado de este repositorio es su red de seguridad propia, la que no depende
+de que el proveedor siga existiendo.

@@ -13,10 +13,10 @@
 //     total de efectivo en caja son SUMAS derivadas. Guardar el acumulado
 //     crearia dos fuentes de verdad que se desincronizan ante una correccion.
 //
-//  3. Los enums se declaran como String porque SQLite no soporta enums en
-//     Prisma. Los valores validos viven en src/types/enums.ts y se validan
-//     con Zod en la capa de servicio. Migrar a PostgreSQL no exige tocar los
-//     datos, solo el bloque datasource.
+//  3. Los enums se declaran como String, no como enum de PostgreSQL. Los
+//     valores validos viven en src/types/enums.ts y se validan con Zod en la
+//     capa de servicio. Agregar un valor nuevo es editar un arreglo, no
+//     migrar una base en produccion a la una de la manana.
 // =============================================================================
 
 generator client {
@@ -24,8 +24,16 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+
+  /// Conexion agrupada (pgbouncer). Es la que usa la aplicacion: reparte unas
+  /// pocas conexiones reales entre muchas peticiones, que es lo que necesita
+  /// una app web y lo unico que aguanta un entorno sin servidor fijo.
+  url = env("DATABASE_URL")
+
+  /// Conexion de sesion, sin agrupar. Prisma la necesita para las migraciones:
+  /// cambiar la estructura de las tablas no funciona a traves del agrupador.
+  directUrl = env("DIRECT_URL")
 }
 
 // -----------------------------------------------------------------------------

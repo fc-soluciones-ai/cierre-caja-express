@@ -17,6 +17,7 @@ import { normalizarNombre } from '../src/lib/excel/columnas';
 import {
   crearRespaldo,
   listarRespaldos,
+  respaldoLocalAplica,
   rutaBaseSqlite,
   verificarArchivoRespaldo,
 } from '../src/server/services/respaldo';
@@ -34,6 +35,13 @@ function comprobar(descripcion: string, real: unknown, esperado: unknown): void 
 }
 
 async function main(): Promise<void> {
+  if (!respaldoLocalAplica()) {
+    console.log('El respaldo de este repositorio es de SQLite (VACUUM INTO).');
+    console.log('La base actual es PostgreSQL, asi que esta comprobacion no aplica:');
+    console.log('los respaldos los hace el proveedor. Ver docs/RESPALDOS.md.');
+    return;
+  }
+
   console.log(`Base de prueba: ${rutaBaseSqlite()}`);
 
   // --- Estado inicial conocido ---

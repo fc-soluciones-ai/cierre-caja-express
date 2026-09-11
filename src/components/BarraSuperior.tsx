@@ -97,7 +97,7 @@ export function BarraSuperior({
           {horasSinRespaldo === null
             ? 'Nunca se ha respaldado la base de datos.'
             : `El ultimo respaldo tiene ${Math.floor(horasSinRespaldo)} horas.`}{' '}
-          Avise al encargado: sin respaldo, un disco danado se lleva toda la historia del
+          Avise al encargado: sin respaldo, un fallo se lleva toda la historia del
           negocio.
         </p>
       ) : null}
