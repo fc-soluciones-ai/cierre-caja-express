@@ -49,7 +49,7 @@ export async function accionEntrar(
 }
 
 export async function accionSalir(): Promise<void> {
-  cerrarSesion();
+  await cerrarSesion();
   redirect('/entrar');
 }
 

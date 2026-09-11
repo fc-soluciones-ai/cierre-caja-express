@@ -41,13 +41,47 @@ model Cajero {
   estado    String   @default("ACTIVO") // ACTIVO | INACTIVO
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// Intentos fallidos seguidos. Se reinicia al entrar bien.
+  intentosFallidos Int @default(0) @map("intentos_fallidos")
+
+  /// Hasta cuando no se aceptan intentos. Un PIN de cuatro digitos se saca
+  /// por fuerza bruta en segundos; lo que lo protege no es su largo sino que
+  /// solo se pueda probar unas pocas veces por minuto.
+  bloqueadoHasta DateTime? @map("bloqueado_hasta")
+
   abonos      AbonoEfectivo[]
   cargasExcel CargaExcel[]
   cierres     CierreChofer[]
   arqueos     ArqueoCaja[]
   eventos     EventoAuditoria[]
+  sesiones    Sesion[]
 
   @@map("cajeros")
+}
+
+/// Sesion abierta de un cajero.
+///
+/// La cookie lleva un token aleatorio, no el id del cajero. Con el id dentro
+/// de la cookie, cualquiera que pudiera escribirla entraria como quien
+/// quisiera; el token existe solo aqui, caduca, y se puede revocar sin
+/// tocar al cajero.
+model Sesion {
+  id        String   @id @default(cuid())
+  /// SHA-256 del token que viaja en la cookie. Si alguien lee esta tabla no
+  /// obtiene sesiones utilizables, igual que con el PIN.
+  tokenHash String   @unique @map("token_hash")
+  cajeroId  String   @map("cajero_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  expiraEn  DateTime @map("expira_en")
+  /// Ultima vez que se uso, para poder cerrar sesiones olvidadas.
+  ultimoUso   DateTime @default(now()) @map("ultimo_uso")
+  dispositivo String?
+
+  cajero Cajero @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
+
+  @@index([cajeroId])
+  @@index([expiraEn])
+  @@map("sesiones")
 }
 
 /// Repartidor. idMeseroSoftRestaurant es la llave de cruce con los Excel.
@@ -304,7 +338,7 @@ model Tiquete {
 model EventoAuditoria {
   id        String   @id @default(cuid())
   timestamp DateTime @default(now())
-  tipo      String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | RESPALDO
+  tipo      String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | RESPALDO
   cajeroId    String? @map("cajero_id")
   choferId    String? @map("chofer_id")
   entidadTipo String? @map("entidad_tipo")

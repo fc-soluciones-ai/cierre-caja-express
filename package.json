@@ -14,7 +14,7 @@
     "test:parser": "tsx scripts/verificar-parser.ts",
     "typecheck": "tsc --noEmit",
     "test:esquema": "tsx scripts/verificar-esquema.ts",
-    "test": "npm run test:parser && npm run test:esquema && npm run test:servicios && npm run test:respaldo",
+    "test": "npm run test:parser && npm run test:esquema && npm run test:servicios && npm run test:sesion && npm run test:respaldo",
     "test:servicios": "cross-env DATABASE_URL=file:./prueba.db IMPRESORA_MODO=NONE tsx scripts/verificar-servicios.ts",
     "db:push:prueba": "cross-env DATABASE_URL=file:./prueba.db prisma db push --skip-generate",
     "print:probar": "tsx scripts/probar-impresora.ts",
@@ -25,7 +25,8 @@
     "db:repartidores": "tsx scripts/cargar-repartidores.ts",
     "ejemplos": "tsx scripts/generar-ejemplos.ts",
     "demo": "tsx scripts/preparar-demo.ts",
-    "pin": "tsx scripts/cambiar-pin.ts"
+    "pin": "tsx scripts/cambiar-pin.ts",
+    "test:sesion": "cross-env DATABASE_URL=file:./prueba.db tsx scripts/verificar-sesion.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

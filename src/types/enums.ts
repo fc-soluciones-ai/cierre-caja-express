@@ -51,6 +51,8 @@ export const TIPO_EVENTO = [
   'TURNO_CANCELADO',
   'REIMPRESION',
   'LOGIN',
+  'LOGIN_FALLIDO',
+  'CAJERO_BLOQUEADO',
   'RESPALDO',
 ] as const;
 export type TipoEvento = (typeof TIPO_EVENTO)[number];

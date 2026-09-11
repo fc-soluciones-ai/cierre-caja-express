@@ -65,7 +65,7 @@ Para servir a una tablet en la misma red, `npm run dev:red`.
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Las 129 comprobaciones automáticas |
+| `npm test` | Las 139 comprobaciones automáticas |
 | `npm run demo -- --aplicar` | Prepara una noche de práctica para entrenar |
 | `npm run db:respaldar` | Copia verificada de la base |
 | `npm run db:restaurar -- --listar` | Ver y restaurar respaldos |
@@ -94,7 +94,8 @@ repartidor trabaja en el negocio; en turno, que trabaja esta noche. El
 dashboard muestra solo lo segundo.
 
 La documentación completa está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
-y el procedimiento de respaldo en [docs/RESPALDOS.md](docs/RESPALDOS.md).
+el procedimiento de respaldo en [docs/RESPALDOS.md](docs/RESPALDOS.md) y el
+paso a PostgreSQL en [docs/SUPABASE.md](docs/SUPABASE.md).
 
 ---
 
