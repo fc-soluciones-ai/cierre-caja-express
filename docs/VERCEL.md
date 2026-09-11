@@ -1,7 +1,8 @@
 # Despliegue en Vercel
 
-El proyecto está conectado al repositorio de GitHub. Cada vez que suba algo a
-la rama `main`, Vercel compila y publica solo.
+El proyecto está conectado al repositorio
+[fc-soluciones-ai/control-express](https://github.com/fc-soluciones-ai/control-express).
+Cada vez que suba algo a la rama `main`, Vercel compila y publica solo.
 
 **https://control-express.vercel.app**
 
