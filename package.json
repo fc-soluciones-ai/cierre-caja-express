@@ -29,7 +29,8 @@
     "datos:exportar": "tsx scripts/exportar-datos.ts",
     "datos:importar": "tsx scripts/importar-datos.ts",
     "db:conectar": "tsx scripts/conectar-supabase.ts",
-    "db:push:pruebas": "tsx scripts/preparar-base-de-pruebas.ts"
+    "db:push:pruebas": "tsx scripts/preparar-base-de-pruebas.ts",
+    "vercel:variables": "tsx scripts/vercel-variables.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

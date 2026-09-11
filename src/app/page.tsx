@@ -13,7 +13,7 @@ import { BarraSuperior } from '@/components/BarraSuperior';
 import { GrillaChoferes } from '@/components/GrillaChoferes';
 import { diaOperativoDe } from '@/lib/fechas';
 import { efectivoTeoricoEnCaja, resumenChoferesEnTurno } from '@/server/services/caja';
-import { ultimoRespaldo } from '@/server/services/respaldo';
+import { estaInstanciaRespalda, ultimoRespaldo } from '@/server/services/respaldo';
 import { cajeroDeSesion } from '@/server/services/sesion';
 import { choferesDisponiblesParaTurno } from '@/server/services/turnos';
 
@@ -28,12 +28,16 @@ export default async function Dashboard() {
     efectivoTeoricoEnCaja(diaOperativo),
     resumenChoferesEnTurno(),
     choferesDisponiblesParaTurno(),
-    ultimoRespaldo(),
+    estaInstanciaRespalda() ? ultimoRespaldo() : Promise.resolve(null),
   ]);
 
-  const horasSinRespaldo = respaldo
-    ? (Date.now() - respaldo.modificado.getTime()) / 3_600_000
-    : null;
+  // La copia en la nube no respalda ni puede: el disco es efimero. Avisar de
+  // un respaldo que esa instancia nunca iba a hacer seria ruido permanente.
+  const horasSinRespaldo = !estaInstanciaRespalda()
+    ? 0
+    : respaldo
+      ? (Date.now() - respaldo.modificado.getTime()) / 3_600_000
+      : null;
 
   return (
     <main className="mx-auto max-w-[1600px] p-5">

@@ -98,6 +98,18 @@ export function respaldoLocalAplica(): boolean {
   return (process.env.DATABASE_URL ?? '').startsWith('file:');
 }
 
+/**
+ * Si esta instancia es quien debe respaldar.
+ *
+ * En un entorno sin servidor fijo el disco es efimero: lo que se escriba
+ * desaparece con la peticion, asi que la copia en la nube no puede respaldar
+ * nada y no tiene sentido que avise de que no lo hizo. El respaldo lo corre la
+ * caja del local, por tarea programada.
+ */
+export function estaInstanciaRespalda(): boolean {
+  return process.env.VERCEL === undefined;
+}
+
 export function rutaBaseSqlite(): string {
   const url = process.env.DATABASE_URL ?? '';
   if (!url.startsWith('file:')) {
