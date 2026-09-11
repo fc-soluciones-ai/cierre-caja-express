@@ -6,10 +6,6 @@ Cada vez que suba algo a la rama `main`, Vercel compila y publica solo.
 
 **https://control-express.vercel.app**
 
-La dirección anterior, `cierre-caja-express.vercel.app`, sigue funcionando y
-lleva al mismo sitio. Se conserva para no romper lo que alguien ya tenga
-guardado. Se puede retirar cuando ya nadie la use.
-
 ---
 
 ## 1. Qué es esta copia y qué no es
