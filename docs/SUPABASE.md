@@ -123,3 +123,31 @@ que el proveedor falle.
 bits, que topan en ₡21.400.000 por registro. Ningún movimiento ni total diario
 de una pizzería se acerca. Si alguna vez el sistema se usara en un negocio con
 otro volumen, esas columnas tendrían que pasar a 64 bits.
+
+---
+
+## 8. Una trampa del agrupador que costo caro
+
+Las pruebas destructivas corren contra un esquema aparte llamado `pruebas`.
+La primera version las hacia pasar por el agrupador en modo transaccion, el
+puerto 6543, y eso resulto peligroso.
+
+Ese puerto reparte una misma conexion del servidor entre muchos clientes. El
+`SET search_path` que Prisma emite para apuntar al esquema de pruebas se queda
+pegado en esa conexion, y lo hereda quien la reciba despues. Incluida la
+aplicacion en produccion.
+
+Se vio en vivo: despues de correr las pruebas, TODAS las conexiones nuevas
+veian el esquema de pruebas. El dashboard reportaba cero repartidores y un
+abono nuevo se habria escrito en las tablas equivocadas. Los datos nunca se
+perdieron, pero la aplicacion estaba mirando al lugar equivocado.
+
+Dos cambios lo cierran:
+
+1. La direccion de la aplicacion fija `schema=public` de forma explicita, asi
+   Prisma lo establece en cada conexion y no hereda nada.
+2. Las pruebas van por el puerto 5432, en modo sesion, donde cada conexion es
+   propia y lo que se configure ahi no sale de ella.
+
+La leccion general: en un agrupador en modo transaccion, cualquier `SET` que
+no se limpie es un efecto secundario que viaja a otros clientes.
