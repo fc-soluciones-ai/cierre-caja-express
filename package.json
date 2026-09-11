@@ -28,7 +28,8 @@
     "pin": "tsx scripts/cambiar-pin.ts",
     "test:sesion": "cross-env DATABASE_URL=file:./prueba.db tsx scripts/verificar-sesion.ts",
     "datos:exportar": "tsx scripts/exportar-datos.ts",
-    "datos:importar": "tsx scripts/importar-datos.ts"
+    "datos:importar": "tsx scripts/importar-datos.ts",
+    "db:conectar": "tsx scripts/conectar-supabase.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -40,9 +41,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.11",
     "autoprefixer": "^10.4.20",
     "cross-env": "^10.1.0",
+    "pg": "^8.23.0",
     "postcss": "^8.4.47",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.13",

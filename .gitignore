@@ -9,6 +9,7 @@ next-env.d.ts
 .env
 .env.*
 !.env.example
+.env.anterior
 
 # Respaldos: contienen datos reales del negocio
 respaldos/
