@@ -48,30 +48,27 @@ tenían.
 
 ---
 
-## 3. Protección de acceso: decisión pendiente
+## 3. Protección de acceso
 
-Vercel publica el proyecto con **Vercel Authentication** encendido. Hoy, quien
-abra la dirección sin estar dentro de su equipo de Vercel recibe una pantalla
-de inicio de sesión y no llega a la aplicación.
+**Vercel Authentication está encendido, y así se queda.** Quien abra la
+dirección sin estar dentro del equipo de Vercel recibe una pantalla de inicio
+de sesión y no llega ni a la pantalla del PIN.
 
-Eso tiene consecuencias en los dos sentidos:
+Es deliberado. La aplicación maneja el efectivo de un negocio y se protege con
+cuatro dígitos; esta es una segunda puerta que no cuesta nada mantener. Quien
+necesite entrar a la copia de la nube debe tener cuenta en el equipo de Vercel.
 
-**Si lo deja encendido.** Nadie ajeno llega a la caja, ni siquiera a la
-pantalla del PIN. Para una aplicación que maneja el efectivo de un negocio y
-se protege con cuatro dígitos, es una segunda puerta que vale bastante. El
-costo es que solo entran quienes tengan cuenta en su equipo de Vercel.
+La caja del local no pasa por aquí: corre en la computadora del mostrador y
+solo pide el PIN.
 
-**Si lo apaga.** Cualquiera con la dirección llega a la pantalla de entrada.
-Ahí lo único que protege es el PIN, con su bloqueo a los cinco intentos
-fallidos. Es lo que hace falta si alguien del local debe entrar desde su
-teléfono sin cuenta de Vercel.
+### Si algún día hay que apagarlo
 
-Para apagarlo: **Project Settings → Deployment Protection → Vercel
-Authentication → Disabled**.
+Haría falta solo si cajeros sin cuenta de Vercel tuvieran que entrar desde sus
+teléfonos. En ese caso, **antes** de apagarlo: subir el PIN a seis dígitos, y
+revisar que el bloqueo por intentos siga en su sitio.
 
-La recomendación es dejarlo encendido mientras la copia en la nube sea solo
-para usted y el dueño. Si en algún momento la van a usar cajeros, conviene
-apagarlo y, antes, subir el PIN a seis dígitos.
+Se apaga en **Project Settings → Deployment Protection → Vercel Authentication
+→ Disabled**.
 
 ---
 
