@@ -95,8 +95,9 @@ repartidor trabaja en el negocio; en turno, que trabaja esta noche. El
 dashboard muestra solo lo segundo.
 
 La documentación completa está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
-el procedimiento de respaldo en [docs/RESPALDOS.md](docs/RESPALDOS.md) y el
-paso a PostgreSQL en [docs/SUPABASE.md](docs/SUPABASE.md).
+el procedimiento de respaldo en [docs/RESPALDOS.md](docs/RESPALDOS.md), el
+paso a PostgreSQL en [docs/SUPABASE.md](docs/SUPABASE.md) y el despliegue en
+[docs/VERCEL.md](docs/VERCEL.md).
 
 ---
 
