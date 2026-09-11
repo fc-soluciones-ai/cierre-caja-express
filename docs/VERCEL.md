@@ -45,7 +45,9 @@ aunque sea el mismo usuario y la misma máquina.
 
 La solución es iniciar sesión desde la consola donde va a trabajar:
 
-
+```bash
+vercel login
+```
 
 El comando comprueba la sesión antes de tocar nada, así que un fallo así no
 deja el proyecto con unas variables nuevas y otras viejas.
