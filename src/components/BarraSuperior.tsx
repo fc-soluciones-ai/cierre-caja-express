@@ -37,6 +37,7 @@ const ACCESOS = [
   { href: '/cierre', etiqueta: '📋 Cierre multiple' },
   { href: '/historial', etiqueta: '📜 Historial' },
   { href: '/choferes', etiqueta: '👥 Choferes' },
+  { href: '/motos', etiqueta: '🏍️ Motos' },
 ];
 
 /** Cada cuanto se refresca la pantalla si nadie la toca. */
@@ -102,7 +103,7 @@ export function BarraSuperior({
         </p>
       ) : null}
 
-      <nav className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <nav className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {ACCESOS.map((acceso) => (
           <Link
             key={acceso.href}
