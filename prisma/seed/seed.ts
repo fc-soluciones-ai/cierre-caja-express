@@ -10,24 +10,42 @@
  * El PIN se guarda hasheado con scrypt, nunca en claro.
  */
 
+import { randomInt } from 'node:crypto';
+
 import { prisma } from '../../src/lib/db/prisma';
 import { normalizarNombre } from '../../src/lib/excel/columnas';
 import { hashearPin } from '../../src/server/services/pin';
 import { REPARTIDORES } from './repartidores';
 
-const PIN_INICIAL = process.env.PIN_CAJERO_INICIAL ?? '1234';
+/**
+ * PIN inicial del administrador.
+ *
+ * Si no se indica uno, se genera al azar y se imprime UNA vez. Un valor fijo
+ * escrito en el codigo deja de ser secreto en cuanto el repositorio se publica,
+ * y la caja se queda con el de fabrica porque nadie se acuerda de cambiarlo.
+ *
+ * Se cambia despues con: npm run pin
+ */
+const PIN_INICIAL =
+  process.env.PIN_CAJERO_INICIAL ?? String(randomInt(100_000, 1_000_000));
 
 async function main(): Promise<void> {
-  const admin = await prisma.cajero.upsert({
-    where: { id: 'cajero-admin' },
-    update: {},
-    create: {
-      id: 'cajero-admin',
-      nombre: 'Administrador',
-      rol: 'ADMIN',
-      pin: hashearPin(PIN_INICIAL),
-    },
-  });
+  // El PIN solo se genera y se anuncia si el administrador no existia. Si ya
+  // estaba, su PIN es el que alguien puso y el seed no lo toca ni lo conoce:
+  // imprimir uno nuevo aqui haria creer al operador que ese es el que sirve.
+  const existente = await prisma.cajero.findUnique({ where: { id: 'cajero-admin' } });
+  const esNuevo = existente === null;
+
+  const admin =
+    existente ??
+    (await prisma.cajero.create({
+      data: {
+        id: 'cajero-admin',
+        nombre: 'Administrador',
+        rol: 'ADMIN',
+        pin: hashearPin(PIN_INICIAL),
+      },
+    }));
   console.log(`Cajero administrador listo: ${admin.nombre}`);
 
   for (const repartidor of REPARTIDORES) {
@@ -44,9 +62,14 @@ async function main(): Promise<void> {
     });
   }
   console.log(`${REPARTIDORES.length} repartidores del padron listos.`);
-  console.log(
-    `\nPIN inicial del administrador: ${PIN_INICIAL} — cambielo antes de usar el sistema en caja.`,
-  );
+
+  if (esNuevo) {
+    console.log(`\nPIN inicial del administrador: ${PIN_INICIAL}`);
+    console.log('Anotelo: no se vuelve a mostrar. Cambielo con: npm run pin');
+  } else {
+    console.log('\nEl administrador ya existia; su PIN no se toco.');
+    console.log('Para cambiarlo: npm run pin');
+  }
   console.log(
     'Para sincronizar cambios del padron mas adelante: npm run db:repartidores -- --aplicar',
   );

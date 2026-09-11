@@ -47,9 +47,15 @@ npm run db:seed
 npm run dev
 ```
 
-Abra `http://localhost:3000`. El PIN inicial del administrador es `1234` y
-**hay que cambiarlo antes de usar el sistema en caja**: está escrito en este
-repositorio, así que no es un secreto.
+Abra `http://localhost:3000`. El seed genera un PIN aleatorio para el
+administrador y lo imprime una sola vez: anótelo. Para cambiarlo después:
+
+```bash
+npm run pin
+```
+
+El PIN se teclea en la terminal sin mostrarse y nunca se pasa como argumento
+del comando, porque los argumentos quedan en el historial del shell.
 
 Para servir a una tablet en la misma red, `npm run dev:red`.
 
@@ -59,13 +65,14 @@ Para servir a una tablet en la misma red, `npm run dev:red`.
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Las 116 comprobaciones automáticas |
+| `npm test` | Las 129 comprobaciones automáticas |
 | `npm run demo -- --aplicar` | Prepara una noche de práctica para entrenar |
 | `npm run db:respaldar` | Copia verificada de la base |
 | `npm run db:restaurar -- --listar` | Ver y restaurar respaldos |
 | `npm run db:repartidores` | Sincronizar el padrón de repartidores |
 | `npm run print:probar` | Ver las cuatro plantillas de tiquete sin hardware |
 | `npm run ejemplos` | Generar reportes de Excel de prueba |
+| `npm run pin` | Cambiar el PIN de un cajero |
 
 ---
 

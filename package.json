@@ -24,7 +24,8 @@
     "test:respaldo": "cross-env DATABASE_URL=file:./respaldo-prueba.db RESPALDO_DIRECTORIO=./storage/respaldos-prueba tsx scripts/verificar-respaldo.ts",
     "db:repartidores": "tsx scripts/cargar-repartidores.ts",
     "ejemplos": "tsx scripts/generar-ejemplos.ts",
-    "demo": "tsx scripts/preparar-demo.ts"
+    "demo": "tsx scripts/preparar-demo.ts",
+    "pin": "tsx scripts/cambiar-pin.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

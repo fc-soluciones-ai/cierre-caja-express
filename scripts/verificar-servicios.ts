@@ -24,6 +24,7 @@ import { efectivoTeoricoEnCaja, resumenChoferesEnTurno } from '@/server/services
 import { importarCarga, previsualizarCarga } from '@/server/services/cargas';
 import { cerrarTurnos, previsualizarCierre } from '@/server/services/cierres';
 import { crearChofer, desactivarChofer } from '@/server/services/choferes';
+import { hashearPin, motivoPinInvalido, verificarPin } from '@/server/services/pin';
 import {
   abrirTurnoManual,
   cancelarTurnoVacio,
@@ -334,6 +335,28 @@ async function main(): Promise<void> {
     recierre = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
   }
   comprobar('un turno cerrado no se puede volver a cerrar', recierre, 'TURNO_NO_ABIERTO');
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- PIN del cajero ---');
+  comprobar('rechaza el PIN de fabrica', motivoPinInvalido('1234') !== null, true);
+  comprobar('rechaza digitos repetidos', motivoPinInvalido('1111') !== null, true);
+  comprobar('rechaza consecutivos ascendentes', motivoPinInvalido('3456') !== null, true);
+  comprobar('rechaza consecutivos descendentes', motivoPinInvalido('9876') !== null, true);
+  comprobar('rechaza letras', motivoPinInvalido('12a4') !== null, true);
+  comprobar('rechaza demasiado corto', motivoPinInvalido('123') !== null, true);
+  comprobar('rechaza demasiado largo', motivoPinInvalido('1234567') !== null, true);
+  comprobar('acepta uno razonable', motivoPinInvalido('7392'), null);
+  comprobar('acepta uno de seis digitos', motivoPinInvalido('483920'), null);
+
+  const hash = hashearPin('7392');
+  comprobar('el hash no contiene el PIN', hash.includes('7392'), false);
+  comprobar('el PIN correcto verifica', verificarPin('7392', hash), true);
+  comprobar('un PIN distinto no verifica', verificarPin('7393', hash), false);
+  comprobar(
+    'dos hash del mismo PIN son distintos por la sal',
+    hashearPin('7392') === hashearPin('7392'),
+    false,
+  );
 
   // -------------------------------------------------------------------------
   console.log('\n--- Guardas ---');
