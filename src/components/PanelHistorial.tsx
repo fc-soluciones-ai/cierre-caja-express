@@ -174,7 +174,7 @@ export function PanelHistorial({
           <CampoFiltro etiqueta="Repartidor">
             <select
               value={filtrosActuales.choferId}
-              onChange={(e) => cambiarFiltro('chofer', e.target.value)}
+              onChange={(e) => cambiarFiltro('repartidor', e.target.value)}
               className="h-tactil w-full rounded-2xl border border-borde bg-panelClaro px-4 text-slate-100"
             >
               <option value="">Todos</option>

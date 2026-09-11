@@ -21,7 +21,7 @@ export default async function Choferes() {
     <main className="mx-auto max-w-4xl p-5">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestion de choferes</h1>
+          <h1 className="text-3xl font-bold">Gestion de repartidores</h1>
           <p className="text-slate-400">
             {choferes.length} repartidor{choferes.length === 1 ? '' : 'es'} registrado
             {choferes.length === 1 ? '' : 's'}

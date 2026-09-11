@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export default async function Cierre({
   searchParams,
 }: {
-  searchParams: { chofer?: string };
+  searchParams: { repartidor?: string };
 }) {
   const cajero = await cajeroDeSesion();
   if (!cajero) redirect('/entrar');
@@ -57,7 +57,7 @@ export default async function Cierre({
         diaOperativo={diaOperativo}
         previsualizaciones={previsualizaciones}
         efectivoTeoricoCaja={caja.total}
-        choferPreseleccionado={searchParams.chofer}
+        choferPreseleccionado={searchParams.repartidor}
       />
     </main>
   );

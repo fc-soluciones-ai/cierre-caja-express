@@ -36,7 +36,7 @@ const ACCESOS = [
   { href: '/importar', etiqueta: '📁 Importar Excel' },
   { href: '/cierre', etiqueta: '📋 Cierre multiple' },
   { href: '/historial', etiqueta: '📜 Historial' },
-  { href: '/choferes', etiqueta: '👥 Choferes' },
+  { href: '/repartidores', etiqueta: '👥 Repartidores' },
   { href: '/motos', etiqueta: '🏍️ Motos' },
 ];
 

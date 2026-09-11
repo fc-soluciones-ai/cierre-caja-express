@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 interface Parametros {
   desde?: string;
   hasta?: string;
-  chofer?: string;
+  repartidor?: string;
   cajero?: string;
   tipo?: string;
 }
@@ -67,7 +67,7 @@ export default async function Historial({ searchParams }: { searchParams: Parame
   const filtros = {
     desde,
     hasta,
-    choferId: searchParams.chofer || undefined,
+    choferId: searchParams.repartidor || undefined,
     cajeroId: searchParams.cajero || undefined,
     tipos: searchParams.tipo ? ([searchParams.tipo] as TipoEvento[]) : undefined,
   };
@@ -112,7 +112,7 @@ export default async function Historial({ searchParams }: { searchParams: Parame
         filtrosActuales={{
           desde: searchParams.desde ?? '',
           hasta: searchParams.hasta ?? '',
-          choferId: searchParams.chofer ?? '',
+          choferId: searchParams.repartidor ?? '',
           cajeroId: searchParams.cajero ?? '',
           tipo: searchParams.tipo ?? '',
         }}

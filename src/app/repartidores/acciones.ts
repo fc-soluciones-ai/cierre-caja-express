@@ -74,7 +74,7 @@ export async function accionCrearChofer(
     }
 
     revalidatePath('/');
-    revalidatePath('/choferes');
+    revalidatePath('/repartidores');
     return { ok: true, datos: creado };
   } catch (e) {
     return comoResultado(e);
@@ -111,7 +111,7 @@ export async function accionEditarChofer(formData: FormData): Promise<Resultado<
     }
 
     revalidatePath('/');
-    revalidatePath('/choferes');
+    revalidatePath('/repartidores');
     return { ok: true, datos: null };
   } catch (e) {
     return comoResultado(e);
@@ -128,7 +128,7 @@ export async function accionCambiarEstadoChofer(
     else await desactivarChofer(choferId, cajero.id);
 
     revalidatePath('/');
-    revalidatePath('/choferes');
+    revalidatePath('/repartidores');
     return { ok: true, datos: null };
   } catch (e) {
     return comoResultado(e);

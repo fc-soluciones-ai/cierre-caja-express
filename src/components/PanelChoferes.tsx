@@ -15,7 +15,7 @@ import {
   accionCambiarEstadoChofer,
   accionCrearChofer,
   accionEditarChofer,
-} from '@/app/choferes/acciones';
+} from '@/app/repartidores/acciones';
 import { clasificarDiferencia, formatearMoneda } from '@/lib/money/money';
 import type { ChoferConHistoria } from '@/server/services/choferes';
 

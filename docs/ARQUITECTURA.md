@@ -52,7 +52,7 @@ de la pantalla de historial.
 Cierre Caja Expres/
 ├── prisma/
 │   ├── schema.prisma            # Esquema completo, comentado
-│   └── seed/seed.ts             # Cajero inicial y choferes de ejemplo
+│   └── seed/seed.ts             # Usuario inicial y repartidores de ejemplo
 ├── docs/
 │   ├── ARQUITECTURA.md          # Este documento
 │   └── RESPALDOS.md             # Respaldo, restauración y tarea programada
@@ -77,7 +77,7 @@ Cierre Caja Expres/
     │   ├── importar/            # Módulo 3: carga de Excel
     │   ├── cierre/              # Módulo 3: conciliación
     │   ├── historial/           # Módulo 5: auditoría y reportería
-    │   └── choferes/            # Módulo 4: CRUD de repartidores
+    │   └── repartidores/        # Módulo 4: CRUD de repartidores
     ├── components/
     │   ├── Numpad.tsx           # Teclado táctil, sirve para monto y PIN
     │   ├── ModalAbono.tsx       # Módulo 2
@@ -467,3 +467,26 @@ Queda por decidir con el negocio:
 3. **Destino de los respaldos.** Ya están construidos y verificados, pero por
    defecto van a una carpeta del mismo disco. Eso protege contra un borrado
    accidental, no contra un disco dañado. Ver [RESPALDOS.md](RESPALDOS.md).
+
+---
+
+## 13. Las palabras que usa el negocio
+
+La pantalla dice **repartidor** y **usuario**. El código y la base de datos
+dicen `Chofer` y `Cajero`.
+
+No es descuido. Cambiar el nombre de las tablas obligaría a migrar todas las
+que las referencian, y a reescribir cada servicio, sin que el encargado de la
+caja notara ninguna diferencia. El nombre interno es un detalle de
+construcción; el que importa es el que se lee en la pantalla y en el tiquete.
+
+Dos aclaraciones del negocio que conviene no olvidar:
+
+- **El repartidor y el chofer son la misma persona.** Maneja la moto y entrega
+  el pedido. No son dos puestos.
+- **En Soft Restaurant el repartidor está dado de alta como mesero**, y por eso
+  el cruce con el Excel se hace por `id_mesero_softrestaurant`.
+
+Lo único que conserva el nombre viejo de cara afuera es la carpeta de fotos,
+`public/choferes/`. Renombrarla dejaría sin imagen a los repartidores que ya
+tienen una.

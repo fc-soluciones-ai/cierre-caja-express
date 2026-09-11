@@ -536,7 +536,7 @@ function ModalEstado({
       etiqueta: '🔧 Mandar al taller',
       nota: moto.esComodin
         ? 'La comodin no se reemplaza a si misma.'
-        : 'Se le presta la comodin al chofer, si esta libre.',
+        : 'Se le presta la comodin al repartidor, si esta libre.',
     },
     {
       estado: 'FUERA_DE_SERVICIO',
@@ -546,7 +546,7 @@ function ModalEstado({
     {
       estado: 'OPERATIVA',
       etiqueta: '✅ Volver a circulacion',
-      nota: 'Se la devuelve a su chofer y libera la comodin.',
+      nota: 'Se la devuelve a su repartidor y libera la comodin.',
     },
   ];
 
@@ -562,7 +562,7 @@ function ModalEstado({
             <p className="text-sm uppercase tracking-wide text-slate-400">Cambiar estado</p>
             <h2 className="cifra text-2xl font-bold">{moto.placa}</h2>
             <p className="mt-1 text-slate-400">
-              {moto.choferNombre ? `La trae ${moto.choferNombre}` : 'Sin chofer asignado'}
+              {moto.choferNombre ? `La trae ${moto.choferNombre}` : 'Sin repartidor asignado'}
             </p>
           </div>
           <button

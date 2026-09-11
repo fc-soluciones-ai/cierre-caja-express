@@ -92,7 +92,7 @@ export function GrillaChoferes({ enTurno, disponibles }: Props) {
           <h3 className="mt-4 text-xl font-bold">Marque quien esta trabajando</h3>
           <p className="mt-2 text-slate-400">
             {disponibles.length === 0
-              ? 'No hay repartidores en el padron. Registrelos en Gestion de Choferes.'
+              ? 'No hay repartidores en el padron. Registrelos en Gestion de repartidores.'
               : 'Toque "Entra un repartidor" y elija a los que llegaron. Solo ellos apareceran aqui.'}
           </p>
         </div>
@@ -147,7 +147,7 @@ export function GrillaChoferes({ enTurno, disponibles }: Props) {
                 <button
                   type="button"
                   className="boton-tactil border border-borde bg-panelClaro text-slate-200"
-                  onClick={() => router.push(`/cierre?chofer=${chofer.choferId}`)}
+                  onClick={() => router.push(`/cierre?repartidor=${chofer.choferId}`)}
                 >
                   📋 Cerrar turno
                 </button>

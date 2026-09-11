@@ -169,7 +169,7 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
             >
               <span className="cifra block font-bold">{m.placa}</span>
               <span className="block truncate text-xs text-slate-400">
-                {m.choferNombre ?? 'sin chofer'}
+                {m.choferNombre ?? 'sin repartidor'}
               </span>
             </button>
           ))}
