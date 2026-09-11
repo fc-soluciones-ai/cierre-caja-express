@@ -79,6 +79,21 @@ function sinClave(url: string): string {
   return url.replace(/:\/\/([^:]+):[^@]+@/, '://$1:****@');
 }
 
+/**
+ * Regiones donde Supabase tiene agrupador, en el orden en que conviene
+ * probarlas desde Centroamerica.
+ *
+ * Se prueban una por una porque el panel no expone la region por API y
+ * preguntarsela al operador es una vuelta mas en la que se puede fallar. El
+ * host resuelve en todas; la que autentica es la correcta.
+ */
+const REGIONES = [
+  'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+  'sa-east-1', 'ca-central-1',
+  'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-central-2', 'eu-north-1',
+  'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1', 'ap-northeast-2', 'ap-south-1',
+];
+
 async function probarConexion(url: string): Promise<{ ok: true; version: string } | { ok: false; error: string }> {
   const cliente = new Client({ connectionString: url, connectionTimeoutMillis: 12_000 });
   try {
@@ -122,29 +137,65 @@ async function main(): Promise<void> {
   const clave = await preguntarOculto('Contrasena de la base de datos: ');
   if (clave.trim() === '') throw new Error('No escribio nada. No se cambio el archivo.');
 
-  const cadenas = construirCadenas(ref, clave, region);
+  let cadenas = construirCadenas(ref, clave, region);
 
   console.log(`\nProbando la conexion ${cadenas.descripcion}...`);
   console.log(`  ${sinClave(cadenas.directa)}`);
-  const prueba = await probarConexion(cadenas.directa);
+  let prueba = await probarConexion(cadenas.directa);
+
+  // La conexion directa de Supabase va por IPv6 y muchos proveedores no lo
+  // tienen. En vez de mandar al operador a buscar la region en el panel, se
+  // prueban las del agrupador hasta dar con la suya.
+  const esProblemaDeRed =
+    !prueba.ok && /ENOTFOUND|ENETUNREACH|EAI_AGAIN|timeout/i.test(prueba.error);
+
+  if (esProblemaDeRed && !region) {
+    console.log('\n  No resuelve por red: su proveedor no tiene IPv6.');
+    console.log('  Buscando su region en el agrupador, que si va por IPv4...\n');
+
+    // Si alguna region contesta "contrasena incorrecta", esa ES la region: el
+    // agrupador solo llega a comprobar credenciales cuando el proyecto existe
+    // ahi. Ese error es mas util que el "no es" de las demas.
+    let errorDeCredenciales: string | null = null;
+
+    for (const candidata of REGIONES) {
+      process.stdout.write(`  ${candidata.padEnd(16)}`);
+      const intento = construirCadenas(ref, clave, candidata);
+      const resultado = await probarConexion(intento.directa);
+      if (resultado.ok) {
+        console.log('conecta');
+        cadenas = intento;
+        prueba = resultado;
+        break;
+      }
+      if (/password|authentication/i.test(resultado.error)) {
+        console.log('es esta, pero la contrasena no');
+        errorDeCredenciales = resultado.error;
+        break;
+      }
+      console.log(/tenant|not found/i.test(resultado.error) ? 'no es' : 'falla');
+    }
+
+    if (!prueba.ok && errorDeCredenciales) {
+      prueba = { ok: false, error: errorDeCredenciales };
+    }
+  }
 
   if (!prueba.ok) {
     console.error(`\nNo se pudo conectar:\n  ${prueba.error}\n`);
-    if (/ENOTFOUND|ENETUNREACH|EAI_AGAIN|timeout/i.test(prueba.error)) {
-      console.error('Eso parece un problema de red, no de contrasena. Las conexiones');
-      console.error('directas de Supabase van por IPv6 y muchos proveedores no lo tienen.');
-      console.error('Busque la region de su proyecto en el panel y repita asi:\n');
-      console.error('  npm run db:conectar -- --pooler --region su-region\n');
-    } else if (/password|authentication/i.test(prueba.error)) {
+    if (/password|authentication/i.test(prueba.error)) {
       console.error('La contrasena no es la correcta. Puede generar una nueva en');
       console.error('Project Settings > Database > Reset database password.\n');
+    } else {
+      console.error('Si conoce la region de su proyecto, indiquela a mano:\n');
+      console.error('  npm run db:conectar -- --pooler --region su-region\n');
     }
     console.error('No se toco el archivo .env. La caja sigue funcionando con la base local.');
     process.exitCode = 1;
     return;
   }
 
-  console.log(`  Conectado. ${prueba.version}\n`);
+  console.log(`\n  Conectado por conexion ${cadenas.descripcion}. ${prueba.version}\n`);
 
   const original = await readFile(RUTA_ENV, 'utf8');
   let nuevo = comentarVariable(original, 'DATABASE_URL', 'Base local anterior, por si hay que volver:');
