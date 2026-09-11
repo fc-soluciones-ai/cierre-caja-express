@@ -23,6 +23,7 @@ import {
   normalizarPlaca,
   obtenerMoto,
 } from '@/server/services/motos';
+import { exigirBaseDePruebas } from './guarda-pruebas';
 
 let fallos = 0;
 
@@ -52,6 +53,8 @@ async function fotoDeFlota(): Promise<Record<string, string>> {
 }
 
 async function main(): Promise<void> {
+  exigirBaseDePruebas();
+
   await limpiar();
 
   const cajero = await prisma.cajero.create({

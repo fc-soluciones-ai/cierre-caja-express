@@ -30,6 +30,7 @@ import {
   cancelarTurnoVacio,
   choferesDisponiblesParaTurno,
 } from '@/server/services/turnos';
+import { exigirBaseDePruebas } from './guarda-pruebas';
 
 let fallos = 0;
 
@@ -88,6 +89,8 @@ function excelConsolidado(filas: Array<[string, string, number, number, number, 
 }
 
 async function main(): Promise<void> {
+  exigirBaseDePruebas();
+
   await limpiar();
   const dia = diaOperativoDe();
   console.log(`\nDia operativo de la prueba: ${dia}\n`);

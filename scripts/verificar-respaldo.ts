@@ -21,6 +21,7 @@ import {
   rutaBaseSqlite,
   verificarArchivoRespaldo,
 } from '../src/server/services/respaldo';
+import { exigirBaseDePruebas } from './guarda-pruebas';
 
 let fallos = 0;
 
@@ -35,6 +36,8 @@ function comprobar(descripcion: string, real: unknown, esperado: unknown): void 
 }
 
 async function main(): Promise<void> {
+  exigirBaseDePruebas();
+
   if (!respaldoLocalAplica()) {
     console.log('El respaldo de este repositorio es de SQLite (VACUUM INTO).');
     console.log('La base actual es PostgreSQL, asi que esta comprobacion no aplica:');

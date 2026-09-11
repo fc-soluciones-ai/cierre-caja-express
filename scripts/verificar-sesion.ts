@@ -19,6 +19,7 @@ import {
   cajeroPorToken,
   revocarSesionesDe,
 } from '@/server/services/sesion';
+import { exigirBaseDePruebas } from './guarda-pruebas';
 
 let fallos = 0;
 
@@ -42,6 +43,8 @@ async function intentar(cajeroId: string, pin: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  exigirBaseDePruebas();
+
   await prisma.sesion.deleteMany();
   await prisma.eventoAuditoria.deleteMany();
   await prisma.cajero.deleteMany();

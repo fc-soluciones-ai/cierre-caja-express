@@ -74,6 +74,10 @@ async function main(): Promise<void> {
     throw new Error('La direccion de pruebas quedo igual a la de trabajo. No se ejecuta nada.');
   }
 
+  // Se entrega por una variable que Prisma NO conoce. Escribir
+  // process.env.DATABASE_URL no sirve: el cliente vuelve a leer .env por su
+  // cuenta y usaria la base del negocio. Ver src/lib/db/prisma.ts.
+  process.env.DATABASE_URL_PRUEBAS = pruebas;
   process.env.DATABASE_URL = pruebas;
   if (process.env.DIRECT_URL) {
     process.env.DIRECT_URL = urlDePruebas(process.env.DIRECT_URL);
