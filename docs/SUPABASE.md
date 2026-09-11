@@ -63,7 +63,30 @@ se usa ninguna función exclusiva de SQLite.
 
 ---
 
-## 4. Crear las tablas
+## 4. Mudar los datos que ya existen
+
+La base local tiene repartidores reales y el PIN que usted ya cambio. Si solo
+se crean las tablas nuevas, eso se pierde.
+
+Antes de cambiar el motor, con la configuracion todavia en SQLite:
+
+```bash
+npm run datos:exportar
+```
+
+Despues de crear las tablas en PostgreSQL:
+
+```bash
+npm run datos:importar -- --aplicar
+```
+
+Los PIN viajan como hash, asi que nadie necesita conocerlos ni cambiarlos.
+Las sesiones abiertas no se trasladan: son credenciales vivas y no cuesta
+nada volver a entrar.
+
+---
+
+## 5. Crear las tablas
 
 ```bash
 npx prisma migrate dev --name inicial
@@ -72,7 +95,7 @@ npm run db:seed
 
 ---
 
-## 5. Comprobar antes de confiar
+## 6. Comprobar antes de confiar
 
 ```bash
 npm test
@@ -83,7 +106,7 @@ Las comprobaciones corren contra la base que diga `DATABASE_URL`. Si pasan las
 
 ---
 
-## 6. Lo que cambia en la operación
+## 7. Lo que cambia en la operación
 
 **Los respaldos ya no son los de este repositorio.** El comando `db:respaldar`
 usa `VACUUM INTO`, que es de SQLite. Con PostgreSQL, Supabase hace respaldos

@@ -26,7 +26,9 @@
     "ejemplos": "tsx scripts/generar-ejemplos.ts",
     "demo": "tsx scripts/preparar-demo.ts",
     "pin": "tsx scripts/cambiar-pin.ts",
-    "test:sesion": "cross-env DATABASE_URL=file:./prueba.db tsx scripts/verificar-sesion.ts"
+    "test:sesion": "cross-env DATABASE_URL=file:./prueba.db tsx scripts/verificar-sesion.ts",
+    "datos:exportar": "tsx scripts/exportar-datos.ts",
+    "datos:importar": "tsx scripts/importar-datos.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

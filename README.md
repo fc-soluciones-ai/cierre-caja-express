@@ -73,6 +73,7 @@ Para servir a una tablet en la misma red, `npm run dev:red`.
 | `npm run print:probar` | Ver las cuatro plantillas de tiquete sin hardware |
 | `npm run ejemplos` | Generar reportes de Excel de prueba |
 | `npm run pin` | Cambiar el PIN de un cajero |
+| `npm run datos:exportar` | Sacar los datos para mudar de motor |
 
 ---
 
