@@ -3,7 +3,11 @@
 El proyecto está conectado al repositorio de GitHub. Cada vez que suba algo a
 la rama `main`, Vercel compila y publica solo.
 
-**https://cierre-caja-express.vercel.app**
+**https://control-express.vercel.app**
+
+La dirección anterior, `cierre-caja-express.vercel.app`, sigue funcionando y
+lleva al mismo sitio. Se conserva para no romper lo que alguien ya tenga
+guardado. Se puede retirar cuando ya nadie la use.
 
 ---
 
