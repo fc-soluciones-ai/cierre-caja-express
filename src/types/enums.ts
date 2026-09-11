@@ -54,8 +54,45 @@ export const TIPO_EVENTO = [
   'LOGIN_FALLIDO',
   'CAJERO_BLOQUEADO',
   'RESPALDO',
+  'MOTO_CREADA',
+  'MOTO_EDITADA',
+  'MOTO_ESTADO',
+  'MOTO_ASIGNADA',
+  'MOTO_LIBERADA',
+  'MANTENIMIENTO',
 ] as const;
 export type TipoEvento = (typeof TIPO_EVENTO)[number];
 
 export const ROL_CAJERO = ['CAJERO', 'SUPERVISOR', 'ADMIN'] as const;
 export type RolCajero = (typeof ROL_CAJERO)[number];
+
+/**
+ * Estado de una motocicleta.
+ *
+ * EN_MANTENIMIENTO es temporal y se espera que vuelva; FUERA_DE_SERVICIO es
+ * para la moto que no va a volver pronto, por accidente o por venta. Las dos
+ * disparan el reemplazo por la comodin, pero conviene distinguirlas en los
+ * reportes.
+ */
+export const ESTADO_MOTO = ['OPERATIVA', 'EN_MANTENIMIENTO', 'FUERA_DE_SERVICIO'] as const;
+export type EstadoMoto = (typeof ESTADO_MOTO)[number];
+
+export const TIPO_MANTENIMIENTO = ['PREVENTIVO', 'CORRECTIVO'] as const;
+export type TipoMantenimiento = (typeof TIPO_MANTENIMIENTO)[number];
+
+/** RTV es la revision tecnica vehicular de Costa Rica. */
+export const CATEGORIA_MANTENIMIENTO = [
+  'GASOLINA',
+  'CAMBIO_ACEITE',
+  'LLANTAS',
+  'FRENOS',
+  'REPUESTOS',
+  'RTV',
+  'SEGURO',
+  'OTRO',
+] as const;
+export type CategoriaMantenimiento = (typeof CATEGORIA_MANTENIMIENTO)[number];
+
+/** FIJA es la moto de siempre del chofer; COMODIN es el reemplazo temporal. */
+export const TIPO_ASIGNACION = ['FIJA', 'COMODIN'] as const;
+export type TipoAsignacion = (typeof TIPO_ASIGNACION)[number];

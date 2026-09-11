@@ -14,7 +14,7 @@
     "test:parser": "tsx scripts/verificar-parser.ts",
     "typecheck": "tsc --noEmit",
     "test:esquema": "tsx scripts/verificar-esquema.ts",
-    "test": "npm run test:parser && npm run test:esquema && npm run test:servicios && npm run test:sesion && npm run test:respaldo",
+    "test": "npm run test:parser && npm run test:esquema && npm run test:servicios && npm run test:sesion && npm run test:flota && npm run test:respaldo",
     "test:servicios": "tsx scripts/base-de-pruebas.ts scripts/verificar-servicios.ts",
     "print:probar": "tsx scripts/probar-impresora.ts",
     "db:limpiar": "tsx scripts/limpiar-movimientos.ts",
@@ -30,7 +30,8 @@
     "datos:importar": "tsx scripts/importar-datos.ts",
     "db:conectar": "tsx scripts/conectar-supabase.ts",
     "db:push:pruebas": "tsx scripts/preparar-base-de-pruebas.ts",
-    "vercel:variables": "tsx scripts/vercel-variables.ts"
+    "vercel:variables": "tsx scripts/vercel-variables.ts",
+    "test:flota": "tsx scripts/base-de-pruebas.ts scripts/verificar-flota.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

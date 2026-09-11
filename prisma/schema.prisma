@@ -57,12 +57,13 @@ model Cajero {
   /// solo se pueda probar unas pocas veces por minuto.
   bloqueadoHasta DateTime? @map("bloqueado_hasta")
 
-  abonos      AbonoEfectivo[]
-  cargasExcel CargaExcel[]
-  cierres     CierreChofer[]
-  arqueos     ArqueoCaja[]
-  eventos     EventoAuditoria[]
-  sesiones    Sesion[]
+  abonos        AbonoEfectivo[]
+  cargasExcel   CargaExcel[]
+  cierres       CierreChofer[]
+  arqueos       ArqueoCaja[]
+  eventos       EventoAuditoria[]
+  sesiones      Sesion[]
+  mantenimiento RegistroMantenimiento[]
 
   @@map("cajeros")
 }
@@ -74,13 +75,13 @@ model Cajero {
 /// quisiera; el token existe solo aqui, caduca, y se puede revocar sin
 /// tocar al cajero.
 model Sesion {
-  id        String   @id @default(cuid())
+  id          String   @id @default(cuid())
   /// SHA-256 del token que viaja en la cookie. Si alguien lee esta tabla no
   /// obtiene sesiones utilizables, igual que con el PIN.
-  tokenHash String   @unique @map("token_hash")
-  cajeroId  String   @map("cajero_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  expiraEn  DateTime @map("expira_en")
+  tokenHash   String   @unique @map("token_hash")
+  cajeroId    String   @map("cajero_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiraEn    DateTime @map("expira_en")
   /// Ultima vez que se uso, para poder cerrar sesiones olvidadas.
   ultimoUso   DateTime @default(now()) @map("ultimo_uso")
   dispositivo String?
@@ -107,8 +108,9 @@ model Chofer {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  turnos      TurnoChofer[]
-  ventasExcel VentaChoferExcel[]
+  turnos       TurnoChofer[]
+  ventasExcel  VentaChoferExcel[]
+  asignaciones AsignacionMoto[]
 
   @@index([nombreNormalizado])
   @@index([estado])
@@ -344,13 +346,13 @@ model Tiquete {
 /// Bitacora append-only. Nunca se actualiza ni se borra: es la fuente de la
 /// pantalla de Historial y Auditoria.
 model EventoAuditoria {
-  id        String   @id @default(cuid())
-  timestamp DateTime @default(now())
-  tipo      String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | RESPALDO
-  cajeroId    String? @map("cajero_id")
-  choferId    String? @map("chofer_id")
-  entidadTipo String? @map("entidad_tipo")
-  entidadId   String? @map("entidad_id")
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  tipo        String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | RESPALDO | MOTO_CREADA | MOTO_EDITADA | MOTO_ESTADO | MOTO_ASIGNADA | MOTO_LIBERADA | MANTENIMIENTO
+  cajeroId    String?  @map("cajero_id")
+  choferId    String?  @map("chofer_id")
+  entidadTipo String?  @map("entidad_tipo")
+  entidadId   String?  @map("entidad_id")
 
   /// Monto involucrado en centimos, si aplica. Evita joins en reporteria.
   monto Int?
@@ -365,4 +367,114 @@ model EventoAuditoria {
   @@index([tipo, timestamp])
   @@index([choferId, timestamp])
   @@map("eventos_auditoria")
+}
+
+// -----------------------------------------------------------------------------
+// Flota de motocicletas
+// -----------------------------------------------------------------------------
+
+/// Motocicleta de la flota.
+///
+/// La placa es la llave primaria porque es el identificador que usa el negocio:
+/// aparece en la factura del taller, en el recibo de la gasolinera y en el
+/// seguro. Un id interno obligaria a traducir en cada conversacion con el
+/// mecanico.
+model Motocicleta {
+  /// Normalizada en mayusculas y sin espacios. Ver normalizarPlaca().
+  placa  String @id
+  marca  String
+  modelo String
+  anio   Int
+
+  /// Kilometraje en KILOMETROS ENTEROS, no decimales.
+  ///
+  /// Un odometro muestra kilometros enteros y nadie registra fracciones. Con
+  /// decimales, el costo por kilometro heredaria el error de redondeo binario
+  /// que en este sistema ya se evito para el dinero.
+  kilometrajeActual Int @map("kilometraje_actual")
+
+  /// La moto de respaldo, sin chofer fijo. Entra cuando otra cae al taller.
+  esComodin Boolean @default(false) @map("es_comodin")
+
+  estado  String  @default("OPERATIVA") // OPERATIVA | EN_MANTENIMIENTO | FUERA_DE_SERVICIO
+  fotoUrl String? @map("foto_url")
+  notas   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  asignaciones  AsignacionMoto[]
+  mantenimiento RegistroMantenimiento[]
+
+  @@index([estado])
+  @@index([esComodin])
+  @@map("motocicletas")
+}
+
+/// Quien anduvo en cual moto y desde cuando.
+///
+/// No se guarda un simple "chofer asignado" en la moto porque eso pierde la
+/// historia: el dia que hay que saber quien manejaba la moto que se accidento
+/// el martes, o cuantos kilometros hizo cada quien, un solo campo ya fue
+/// sobrescrito. La asignacion vigente es la que no tiene fecha de fin.
+model AsignacionMoto {
+  id       String @id @default(cuid())
+  placa    String
+  choferId String @map("chofer_id")
+  tipo     String @default("FIJA") // FIJA | COMODIN
+
+  fechaInicio DateTime  @default(now()) @map("fecha_inicio")
+  fechaFin    DateTime? @map("fecha_fin")
+  motivo      String?
+
+  /// Candados de integridad, con la misma tecnica que los turnos: valen
+  /// mientras la asignacion esta vigente y NULL cuando termina. Como los NULL
+  /// no colisionan en un indice unico, la base garantiza por si sola que un
+  /// chofer no tenga dos motos ni una moto dos choferes.
+  candadoChoferActivo String? @unique @map("candado_chofer_activo")
+  candadoMotoActiva   String? @unique @map("candado_moto_activa")
+
+  moto   Motocicleta @relation(fields: [placa], references: [placa], onDelete: Restrict)
+  chofer Chofer      @relation(fields: [choferId], references: [id], onDelete: Restrict)
+
+  @@index([choferId, fechaInicio])
+  @@index([placa, fechaInicio])
+  @@map("asignaciones_moto")
+}
+
+/// Gasto o servicio hecho a una moto: gasolina, taller, repuestos, seguro.
+///
+/// Es la fuente del costo por kilometro y del historial por placa. Como todo
+/// movimiento de dinero en este sistema, el costo va en centimos enteros.
+model RegistroMantenimiento {
+  id    String @id @default(cuid())
+  placa String
+
+  tipo      String // PREVENTIVO | CORRECTIVO
+  categoria String // GASOLINA | CAMBIO_ACEITE | LLANTAS | FRENOS | REPUESTOS | RTV | SEGURO | OTRO
+
+  descripcion String?
+
+  /// Centimos. Cero es valido: una revision en garantia no cuesta nada.
+  costoTotal Int @map("costo_total")
+
+  /// Kilometraje del odometro en el momento del evento, en kilometros enteros.
+  kilometrajeEvento Int @map("kilometraje_evento")
+
+  tallerOProveedor String? @map("taller_o_proveedor")
+  comprobanteUrl   String? @map("comprobante_url")
+
+  timestamp DateTime @default(now())
+  cajeroId  String   @map("cajero_id")
+
+  /// Misma proteccion contra doble toque que en los abonos.
+  claveIdempotencia String? @unique @map("clave_idempotencia")
+
+  moto   Motocicleta @relation(fields: [placa], references: [placa], onDelete: Restrict)
+  cajero Cajero      @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+
+  @@index([placa, timestamp])
+  @@index([categoria, timestamp])
+  @@index([timestamp])
+  @@map("registros_mantenimiento")
 }
