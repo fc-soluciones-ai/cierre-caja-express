@@ -57,6 +57,16 @@ export interface MotoConAsignacion {
   estado: string;
   fotoUrl: string | null;
   notas: string | null;
+  tipoAceite: string | null;
+  intervaloAceiteKm: number | null;
+  medidaLlantaDelantera: string | null;
+  medidaLlantaTrasera: string | null;
+  presionLlantasPsi: string | null;
+  frenoDelantero: string | null;
+  frenoTrasero: string | null;
+  medidaCadena: string | null;
+  vencimientoRtv: Date | null;
+  vencimientoSeguro: Date | null;
   /** Chofer que la trae hoy, si alguno. */
   choferId: string | null;
   choferNombre: string | null;
@@ -80,6 +90,16 @@ function aVista(
     estado: moto.estado,
     fotoUrl: moto.fotoUrl,
     notas: moto.notas,
+    tipoAceite: moto.tipoAceite,
+    intervaloAceiteKm: moto.intervaloAceiteKm,
+    medidaLlantaDelantera: moto.medidaLlantaDelantera,
+    medidaLlantaTrasera: moto.medidaLlantaTrasera,
+    presionLlantasPsi: moto.presionLlantasPsi,
+    frenoDelantero: moto.frenoDelantero,
+    frenoTrasero: moto.frenoTrasero,
+    medidaCadena: moto.medidaCadena,
+    vencimientoRtv: moto.vencimientoRtv,
+    vencimientoSeguro: moto.vencimientoSeguro,
     choferId: vigente?.choferId ?? null,
     choferNombre: vigente?.chofer.nombre ?? null,
     tipoAsignacion: vigente?.tipo ?? null,
@@ -126,6 +146,75 @@ export interface EntradaMoto {
   esComodin?: boolean;
   fotoUrl?: string;
   notas?: string;
+  /** Ficha tecnica. Toda opcional: se llena cuando alguien la averigua. */
+  ficha?: FichaTecnica;
+}
+
+/**
+ * Las medidas de repuesto y los vencimientos de papeles de una moto.
+ *
+ * Las medidas son texto porque son designaciones, no cantidades: "2.75-18" o
+ * "428H - 120 L" no se suman ni se comparan, se leen en el mostrador.
+ */
+export interface FichaTecnica {
+  tipoAceite?: string | null;
+  /** Cada cuantos km toca el aceite en ESTA moto. Sin valor, el general. */
+  intervaloAceiteKm?: number | null;
+  medidaLlantaDelantera?: string | null;
+  medidaLlantaTrasera?: string | null;
+  presionLlantasPsi?: string | null;
+  frenoDelantero?: string | null;
+  frenoTrasero?: string | null;
+  medidaCadena?: string | null;
+  vencimientoRtv?: Date | null;
+  vencimientoSeguro?: Date | null;
+}
+
+/** Deja el texto listo para guardar: sin espacios sobrantes, y vacio es null. */
+function texto(valor: string | null | undefined): string | null | undefined {
+  if (valor === undefined) return undefined;
+  if (valor === null) return null;
+  const limpio = valor.trim();
+  return limpio === '' ? null : limpio;
+}
+
+/**
+ * Convierte la ficha en columnas para Prisma.
+ *
+ * Omite lo que venga como undefined, para que editar la pestana de datos
+ * generales no borre la ficha tecnica que ya estaba llena.
+ */
+function columnasDeFicha(ficha: FichaTecnica | undefined) {
+  if (!ficha) return {};
+
+  if (
+    ficha.intervaloAceiteKm !== undefined &&
+    ficha.intervaloAceiteKm !== null &&
+    (!Number.isInteger(ficha.intervaloAceiteKm) || ficha.intervaloAceiteKm <= 0)
+  ) {
+    throw new ErrorNegocio(
+      'DATOS_INVALIDOS',
+      'El intervalo de cambio de aceite debe ser un numero entero de kilometros mayor que cero.',
+    );
+  }
+
+  const columnas: Record<string, unknown> = {};
+  const poner = (clave: string, valor: unknown) => {
+    if (valor !== undefined) columnas[clave] = valor;
+  };
+
+  poner('tipoAceite', texto(ficha.tipoAceite));
+  poner('intervaloAceiteKm', ficha.intervaloAceiteKm);
+  poner('medidaLlantaDelantera', texto(ficha.medidaLlantaDelantera));
+  poner('medidaLlantaTrasera', texto(ficha.medidaLlantaTrasera));
+  poner('presionLlantasPsi', texto(ficha.presionLlantasPsi));
+  poner('frenoDelantero', texto(ficha.frenoDelantero));
+  poner('frenoTrasero', texto(ficha.frenoTrasero));
+  poner('medidaCadena', texto(ficha.medidaCadena));
+  poner('vencimientoRtv', ficha.vencimientoRtv);
+  poner('vencimientoSeguro', ficha.vencimientoSeguro);
+
+  return columnas;
 }
 
 export async function crearMoto(entrada: EntradaMoto, cajeroId: string): Promise<{ placa: string }> {
@@ -165,6 +254,7 @@ export async function crearMoto(entrada: EntradaMoto, cajeroId: string): Promise
         esComodin: entrada.esComodin ?? false,
         fotoUrl: entrada.fotoUrl ?? null,
         notas: entrada.notas ?? null,
+        ...columnasDeFicha(entrada.ficha),
       },
     });
 
@@ -224,6 +314,7 @@ export async function editarMoto(
         ...(cambios.esComodin !== undefined ? { esComodin: cambios.esComodin } : {}),
         ...(cambios.fotoUrl !== undefined ? { fotoUrl: cambios.fotoUrl } : {}),
         ...(cambios.notas !== undefined ? { notas: cambios.notas } : {}),
+        ...columnasDeFicha(cambios.ficha),
       },
     });
 

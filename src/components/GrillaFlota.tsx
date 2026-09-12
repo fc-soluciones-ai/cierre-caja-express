@@ -41,7 +41,7 @@ const NOMBRE_CATEGORIA: Record<string, string> = {
   GASOLINA: 'Gasolina',
   REPUESTOS: 'Repuestos',
   RTV: 'Revision tecnica',
-  SEGURO: 'Seguro',
+  SEGURO: 'Marchamo y seguro',
   OTRO: 'Otro',
 };
 
@@ -68,6 +68,29 @@ const COLOR: Record<Semaforo, { punto: string; borde: string; texto: string }> =
 
 function enKilometros(km: number): string {
   return `${km.toLocaleString('es-CR')} km`;
+}
+
+/**
+ * Como se lee una alerta en la tarjeta.
+ *
+ * Las de kilometraje hablan de kilometros y las de papeles hablan de dias.
+ * Mezclar las dos unidades en una misma frase confundiria: "vencido por 30"
+ * no dice si son kilometros o dias.
+ */
+function textoDeAlerta(alerta: AlertaMoto): string {
+  if (alerta.clase === 'KILOMETRAJE') {
+    return alerta.nivel === 'VENCIDO'
+      ? `vencido por ${Math.abs(alerta.kmRestantes).toLocaleString('es-CR')} km`
+      : `faltan ${alerta.kmRestantes.toLocaleString('es-CR')} km`;
+  }
+
+  const fecha = alerta.vence.toLocaleDateString('es-CR');
+  if (alerta.nivel === 'VENCIDO') {
+    const dias = Math.abs(alerta.diasRestantes);
+    return `vencio el ${fecha}, hace ${dias} dia${dias === 1 ? '' : 's'}`;
+  }
+  if (alerta.diasRestantes === 0) return `vence hoy, ${fecha}`;
+  return `vence el ${fecha}, en ${alerta.diasRestantes} dia${alerta.diasRestantes === 1 ? '' : 's'}`;
 }
 
 /**
@@ -144,7 +167,8 @@ export function GrillaFlota({ flota, alertas, choferesLibres }: Props) {
           modelo: datos.modelo,
           anio: datos.anio,
           esComodin: datos.esComodin,
-          notas: datos.notas,
+          notas: datos.notas ?? '',
+          ficha: datos.ficha,
         });
         setEnProceso(false);
         if (!respuesta.ok) {
@@ -377,7 +401,7 @@ export function GrillaFlota({ flota, alertas, choferesLibres }: Props) {
                 <ul className="mt-3 space-y-1">
                   {suyas.map((alerta) => (
                     <li
-                      key={alerta.categoria}
+                      key={`${alerta.clase}-${alerta.categoria}`}
                       className={`rounded-lg px-2 py-1 text-xs ${
                         alerta.nivel === 'VENCIDO'
                           ? 'bg-alerta/15 text-alerta'
@@ -385,9 +409,7 @@ export function GrillaFlota({ flota, alertas, choferesLibres }: Props) {
                       }`}
                     >
                       {NOMBRE_CATEGORIA[alerta.categoria] ?? alerta.categoria}:{' '}
-                      {alerta.nivel === 'VENCIDO'
-                        ? `vencido por ${Math.abs(alerta.kmRestantes).toLocaleString('es-CR')} km`
-                        : `faltan ${alerta.kmRestantes.toLocaleString('es-CR')} km`}
+                      {textoDeAlerta(alerta)}
                     </li>
                   ))}
                 </ul>

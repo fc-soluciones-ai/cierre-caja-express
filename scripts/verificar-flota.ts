@@ -19,6 +19,7 @@ import {
   asignarMoto,
   cambiarEstadoMoto,
   crearMoto,
+  editarMoto,
   listarFlota,
   normalizarPlaca,
   obtenerMoto,
@@ -302,20 +303,21 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------
   console.log('\n--- Alertas por kilometraje ---');
   const alertas = await alertasDeFlota();
-  const aceite100 = alertas.find((a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE');
+  const porKilometraje = alertas.filter((a) => a.clase === 'KILOMETRAJE');
+  const aceite100 = porKilometraje.find(
+    (a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE',
+  );
   comprobar(
     'el aceite de MOT100 aun no vence',
     aceite100 === undefined || aceite100.nivel === 'PROXIMO',
     true,
   );
 
-  const frenos200 = alertas.find((a) => a.placa === 'MOT200' && a.categoria === 'FRENOS');
-  comprobar('una moto sin servicios registrados sale vencida', frenos200?.nivel, 'VENCIDO');
-  comprobar(
-    'contando desde cero, no exenta',
-    frenos200?.ultimoKm,
-    null,
+  const frenos200 = porKilometraje.find(
+    (a) => a.placa === 'MOT200' && a.categoria === 'FRENOS',
   );
+  comprobar('una moto sin servicios registrados sale vencida', frenos200?.nivel, 'VENCIDO');
+  comprobar('contando desde cero, no exenta', frenos200?.ultimoKm, null);
 
   // Se fuerza el vencimiento del aceite rodando 2 000 km mas.
   await registrarMantenimiento({
@@ -327,11 +329,93 @@ async function main(): Promise<void> {
     cajeroId: cajero.id,
   });
   const vencidas = await alertasDeFlota();
-  const aceiteVencido = vencidas.find(
-    (a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE',
-  );
+  const aceiteVencido = vencidas
+    .filter((a) => a.clase === 'KILOMETRAJE')
+    .find((a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE');
   comprobar('pasados 2 000 km el aceite vence', aceiteVencido?.nivel, 'VENCIDO');
   comprobar('y dice cuanto se paso', aceiteVencido!.kmRestantes < 0, true);
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- Ficha tecnica ---');
+
+  const enDias = (dias: number) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + dias);
+    return d;
+  };
+
+  await editarMoto(
+    'MOT100',
+    {
+      ficha: {
+        tipoAceite: '  10W-40 Semi-sintetico  ',
+        intervaloAceiteKm: 1_000,
+        medidaLlantaDelantera: '2.75-18',
+        medidaCadena: '428H - 120 L',
+        frenoDelantero: 'Disco',
+        vencimientoRtv: enDias(10),
+        vencimientoSeguro: enDias(-5),
+      },
+    },
+    cajero.id,
+  );
+
+  const conFicha = await obtenerMoto('MOT100');
+  comprobar('el texto se guarda sin espacios sobrantes', conFicha.tipoAceite, '10W-40 Semi-sintetico');
+  comprobar('la medida de llanta se guarda tal cual', conFicha.medidaLlantaDelantera, '2.75-18');
+  comprobar('la cadena tambien', conFicha.medidaCadena, '428H - 120 L');
+  comprobar('lo que no se lleno queda vacio', conFicha.medidaLlantaTrasera, null);
+
+  // Editar solo los datos generales no debe borrar la ficha ya cargada.
+  await editarMoto('MOT100', { marca: 'Honda' }, cajero.id);
+  comprobar(
+    'editar lo general no borra la ficha',
+    (await obtenerMoto('MOT100')).tipoAceite,
+    '10W-40 Semi-sintetico',
+  );
+
+  let intervaloMalo = '';
+  try {
+    await editarMoto('MOT100', { ficha: { intervaloAceiteKm: 0 } }, cajero.id);
+  } catch (e) {
+    intervaloMalo = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('un intervalo de cero se rechaza', intervaloMalo, 'DATOS_INVALIDOS');
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- Alertas por fecha ---');
+  const porFecha = (await alertasDeFlota()).filter((a) => a.clase === 'FECHA');
+
+  const rtv = porFecha.find((a) => a.placa === 'MOT100' && a.categoria === 'RTV');
+  comprobar('la revision tecnica que vence en 10 dias avisa', rtv?.nivel, 'PROXIMO');
+  comprobar('y dice cuantos dias faltan', rtv?.diasRestantes, 10);
+
+  const seguro = porFecha.find((a) => a.placa === 'MOT100' && a.categoria === 'SEGURO');
+  comprobar('el marchamo vencido hace 5 dias sale vencido', seguro?.nivel, 'VENCIDO');
+  comprobar('con los dias en negativo', seguro?.diasRestantes, -5);
+
+  comprobar(
+    'una moto sin fechas anotadas no genera alerta de papeles',
+    porFecha.some((a) => a.placa === 'MOT200'),
+    false,
+  );
+
+  await editarMoto('MOT100', { ficha: { vencimientoRtv: enDias(200) } }, cajero.id);
+  comprobar(
+    'una fecha lejana no molesta',
+    (await alertasDeFlota()).some(
+      (a) => a.clase === 'FECHA' && a.placa === 'MOT100' && a.categoria === 'RTV',
+    ),
+    false,
+  );
+
+  // El intervalo de la ficha manda sobre el general: MOT100 pide aceite cada
+  // 1 000 km en vez de 2 000.
+  const aceitePropio = (await alertasDeFlota())
+    .filter((a) => a.clase === 'KILOMETRAJE')
+    .find((a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE');
+  comprobar('el intervalo de la ficha manda sobre el general', aceitePropio?.intervalo, 1_000);
 
   // -------------------------------------------------------------------------
   console.log('\n--- Auditoria ---');

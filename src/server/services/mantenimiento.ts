@@ -156,17 +156,38 @@ export async function registrarMantenimiento(
 // Alertas por kilometraje
 // ---------------------------------------------------------------------------
 
-export interface AlertaMoto {
-  placa: string;
-  categoria: CategoriaMantenimiento;
-  intervalo: number;
-  /** Kilometraje del ultimo servicio de esa categoria, o null si nunca hubo. */
-  ultimoKm: number | null;
-  kmDesdeUltimo: number;
-  /** Negativo cuando ya se paso. */
-  kmRestantes: number;
-  nivel: 'VENCIDO' | 'PROXIMO';
-}
+/**
+ * Una alerta de la flota.
+ *
+ * Hay dos clases y no se pueden mezclar en una sola cuenta: el aceite vence
+ * por kilometros rodados, la revision tecnica vence por calendario. Una moto
+ * parada en el taller no gasta aceite, pero su marchamo si se vence.
+ */
+export type AlertaMoto =
+  | {
+      clase: 'KILOMETRAJE';
+      placa: string;
+      categoria: CategoriaMantenimiento;
+      intervalo: number;
+      /** Kilometraje del ultimo servicio de esa categoria, o null si nunca hubo. */
+      ultimoKm: number | null;
+      kmDesdeUltimo: number;
+      /** Negativo cuando ya se paso. */
+      kmRestantes: number;
+      nivel: 'VENCIDO' | 'PROXIMO';
+    }
+  | {
+      clase: 'FECHA';
+      placa: string;
+      categoria: 'RTV' | 'SEGURO';
+      vence: Date;
+      /** Negativo cuando ya se vencio. */
+      diasRestantes: number;
+      nivel: 'VENCIDO' | 'PROXIMO';
+    };
+
+/** Con cuantos dias de anticipacion se avisa de un vencimiento de papeles. */
+const DIAS_AVISO_VENCIMIENTO = 30;
 
 /**
  * Que servicios tiene pendientes cada moto.
@@ -178,13 +199,27 @@ export interface AlertaMoto {
 export async function alertasDeFlota(): Promise<AlertaMoto[]> {
   const motos = await prisma.motocicleta.findMany({
     where: { estado: { not: 'FUERA_DE_SERVICIO' } },
-    select: { placa: true, kilometrajeActual: true },
+    select: {
+      placa: true,
+      kilometrajeActual: true,
+      intervaloAceiteKm: true,
+      vencimientoRtv: true,
+      vencimientoSeguro: true,
+    },
   });
 
   const alertas: AlertaMoto[] = [];
+  const hoy = inicioDeHoy();
 
   for (const moto of motos) {
-    for (const [categoria, intervalo] of Object.entries(INTERVALOS_KM)) {
+    // --- Por kilometraje ---------------------------------------------------
+    for (const [categoria, general] of Object.entries(INTERVALOS_KM)) {
+      // La ficha de la moto manda sobre el intervalo general: una moto vieja
+      // o de mucha carga puede pedir el aceite antes.
+      const intervalo =
+        categoria === 'CAMBIO_ACEITE' && moto.intervaloAceiteKm
+          ? moto.intervaloAceiteKm
+          : general;
       if (!intervalo) continue;
 
       const ultimo = await prisma.registroMantenimiento.findFirst({
@@ -197,32 +232,73 @@ export async function alertasDeFlota(): Promise<AlertaMoto[]> {
       const kmDesdeUltimo = moto.kilometrajeActual - (ultimoKm ?? 0);
       const kmRestantes = intervalo - kmDesdeUltimo;
 
-      if (kmRestantes <= 0) {
+      if (kmRestantes <= 0 || kmDesdeUltimo >= intervalo * UMBRAL_AVISO) {
         alertas.push({
+          clase: 'KILOMETRAJE',
           placa: moto.placa,
           categoria: categoria as CategoriaMantenimiento,
           intervalo,
           ultimoKm,
           kmDesdeUltimo,
           kmRestantes,
-          nivel: 'VENCIDO',
-        });
-      } else if (kmDesdeUltimo >= intervalo * UMBRAL_AVISO) {
-        alertas.push({
-          placa: moto.placa,
-          categoria: categoria as CategoriaMantenimiento,
-          intervalo,
-          ultimoKm,
-          kmDesdeUltimo,
-          kmRestantes,
-          nivel: 'PROXIMO',
+          nivel: kmRestantes <= 0 ? 'VENCIDO' : 'PROXIMO',
         });
       }
     }
+
+    // --- Por calendario ----------------------------------------------------
+    //
+    // Sin fecha en la ficha no hay alerta. Es distinto de los servicios por
+    // kilometraje, donde no haber registrado nunca un cambio de aceite SI es
+    // motivo de alarma: ahi el odometro dice que la moto rodo. Aqui, una fecha
+    // en blanco solo significa que nadie la ha anotado todavia, y llenar el
+    // tablero de rojo por eso haria que dejaran de mirarlo.
+    for (const [categoria, vence] of [
+      ['RTV', moto.vencimientoRtv],
+      ['SEGURO', moto.vencimientoSeguro],
+    ] as Array<['RTV' | 'SEGURO', Date | null]>) {
+      if (!vence) continue;
+
+      const diasRestantes = Math.round(
+        (inicioDelDiaDe(vence).getTime() - hoy.getTime()) / 86_400_000,
+      );
+      if (diasRestantes > DIAS_AVISO_VENCIMIENTO) continue;
+
+      alertas.push({
+        clase: 'FECHA',
+        placa: moto.placa,
+        categoria,
+        vence,
+        diasRestantes,
+        // El dia que vence todavia sirve: se cuenta vencida a partir del
+        // siguiente.
+        nivel: diasRestantes < 0 ? 'VENCIDO' : 'PROXIMO',
+      });
+    }
   }
 
-  // Lo vencido primero, y dentro de eso lo mas atrasado.
-  return alertas.sort((a, b) => a.kmRestantes - b.kmRestantes);
+  // Lo vencido primero, y dentro de eso lo mas atrasado. Las dos clases se
+  // ordenan por separado y las de fecha van despues, porque un numero de dias
+  // y uno de kilometros no se pueden comparar entre si.
+  const porKm = alertas
+    .filter((a) => a.clase === 'KILOMETRAJE')
+    .sort((a, b) => (a as { kmRestantes: number }).kmRestantes - (b as { kmRestantes: number }).kmRestantes);
+  const porFecha = alertas
+    .filter((a) => a.clase === 'FECHA')
+    .sort((a, b) => (a as { diasRestantes: number }).diasRestantes - (b as { diasRestantes: number }).diasRestantes);
+
+  return [...porKm, ...porFecha];
+}
+
+/** Medianoche de hoy, para contar dias enteros y no horas sueltas. */
+function inicioDeHoy(): Date {
+  return inicioDelDiaDe(new Date());
+}
+
+function inicioDelDiaDe(fecha: Date): Date {
+  const d = new Date(fecha);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 // ---------------------------------------------------------------------------

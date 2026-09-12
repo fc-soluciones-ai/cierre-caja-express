@@ -400,6 +400,41 @@ model Motocicleta {
   fotoUrl String? @map("foto_url")
   notas   String?
 
+  // --- Ficha tecnica -------------------------------------------------------
+  //
+  // Todo opcional: una moto se da de alta con la placa y el odometro, y la
+  // ficha se llena despues, cuando alguien va al taller y anota las medidas.
+  // Obligarla de entrada haria que nadie registrara ninguna moto.
+  //
+  // Las medidas son texto y no numeros a proposito: "2.75-18", "90/90-18" y
+  // "428H - 120 L" son designaciones, no cantidades. No se suman ni se
+  // comparan, se leen en el mostrador del repuesto.
+
+  /// Ej: "10W-40 Semi-sintetico".
+  tipoAceite String? @map("tipo_aceite")
+
+  /// Cada cuantos kilometros toca el aceite EN ESTA moto. Sin valor se usa el
+  /// intervalo general. Una moto vieja o de mucha carga puede pedir menos.
+  intervaloAceiteKm Int? @map("intervalo_aceite_km")
+
+  medidaLlantaDelantera String? @map("medida_llanta_delantera")
+  medidaLlantaTrasera   String? @map("medida_llanta_trasera")
+
+  /// Ej: "28/32", delantera y trasera.
+  presionLlantasPsi String? @map("presion_llantas_psi")
+
+  frenoDelantero String? @map("freno_delantero") // Disco | Tambor
+  frenoTrasero   String? @map("freno_trasero") // Disco | Tambor
+
+  /// Paso y cantidad de eslabones. Ej: "428H - 120 L".
+  medidaCadena String? @map("medida_cadena")
+
+  /// Revision tecnica vehicular. Vencida, la moto no puede circular.
+  vencimientoRtv DateTime? @map("vencimiento_rtv")
+
+  /// Marchamo y seguro obligatorio.
+  vencimientoSeguro DateTime? @map("vencimiento_seguro")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

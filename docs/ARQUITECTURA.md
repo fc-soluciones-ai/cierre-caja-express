@@ -405,6 +405,39 @@ cubiertos por pruebas:
    libre, lista para el siguiente.
 3. **Se avería la comodín.** No se reemplaza a sí misma; se avisa igual.
 
+### Ficha técnica
+
+Cada moto guarda además lo que alguien necesita saber parado frente al
+mostrador del repuesto: tipo de aceite, medidas de las dos llantas, presión,
+tipo de freno, paso de cadena, y los vencimientos de la revisión técnica y del
+marchamo.
+
+Toda la ficha es opcional y vive en una pestaña aparte del formulario. Si se
+pidiera de entrada, nadie registraría ninguna moto: esas medidas hay que ir a
+buscarlas. Se da de alta hoy con la placa y el odómetro, y la ficha se llena
+el día que se va al taller.
+
+Las medidas se guardan como texto y no como números. «2.75-18», «90/90-18» y
+«428H - 120 L» son designaciones, no cantidades: no se suman ni se comparan,
+se leen en voz alta.
+
+El intervalo de cambio de aceite vive en la ficha y manda sobre el general.
+Una moto vieja o de mucha carga puede pedirlo antes de los 2.000 km.
+
+### Dos clases de alerta
+
+El aceite vence por kilómetros rodados; la revisión técnica vence por
+calendario. No se pueden mezclar en una sola cuenta: una moto parada en el
+taller no gasta aceite, pero su marchamo sí se vence. Por eso `AlertaMoto` es
+una unión de dos formas, y el compilador obliga a distinguirlas en cada lugar
+donde se leen.
+
+Los papeles avisan 30 días antes. Una fecha en blanco no genera alerta, al
+revés de lo que pasa con el kilometraje: ahí, no haber registrado nunca un
+cambio de aceite **sí** es motivo de alarma, porque el odómetro prueba que la
+moto rodó. Una fecha vacía solo significa que nadie la ha anotado, y llenar el
+tablero de rojo por eso haría que dejaran de mirarlo.
+
 ### Semáforo
 
 El tablero pinta cada moto de verde, amarillo o rojo. El estado pesa más que
@@ -428,7 +461,7 @@ cero: cero significaría que rodar no cuesta nada.
 
 ## 12. Estado actual
 
-Terminado y verificado con 185 comprobaciones automáticas más pruebas manuales
+Terminado y verificado con 198 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.
