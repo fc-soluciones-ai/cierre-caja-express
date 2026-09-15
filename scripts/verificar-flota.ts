@@ -11,6 +11,13 @@
 import { prisma } from '@/lib/db/prisma';
 import { esErrorNegocio } from '@/server/errores';
 import {
+  agregarEvidencia,
+  borrarEvidencia,
+  bytesDeEvidencia,
+  evidenciaDe,
+  guardarDatosGps,
+} from '@/server/services/gps';
+import {
   alertasDeFlota,
   registrarMantenimiento,
   resumenDeFlota,
@@ -416,6 +423,88 @@ async function main(): Promise<void> {
     .filter((a) => a.clase === 'KILOMETRAJE')
     .find((a) => a.placa === 'MOT100' && a.categoria === 'CAMBIO_ACEITE');
   comprobar('el intervalo de la ficha manda sobre el general', aceitePropio?.intervalo, 1_000);
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- GPS y su evidencia ---');
+
+  // Un PNG de 1x1 valido. Lo que importa son los ocho bytes de la firma.
+  const png = Buffer.from(
+    '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154' +
+      '789c63000100000500010d0a2db40000000049454e44ae426082',
+    'hex',
+  );
+
+  await guardarDatosGps(
+    'MOT100',
+    { tieneGps: true, proveedor: '  Rastreo SA  ', identificador: '350612345678901' },
+    cajero.id,
+  );
+  const conGps = await obtenerMoto('MOT100');
+  comprobar('queda marcada con GPS', conGps.tieneGps, true);
+  comprobar('el proveedor se limpia', conGps.gpsProveedor, 'Rastreo SA');
+  comprobar('sin foto todavia no hay revision', conGps.gpsRevisadoEn, null);
+
+  let noEsImagen = '';
+  try {
+    await agregarEvidencia(
+      { placa: 'MOT100', tipo: 'CONEXION', contenido: Buffer.from('esto no es una foto') },
+      cajero.id,
+    );
+  } catch (e) {
+    noEsImagen = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('un archivo que no es imagen se rechaza', noEsImagen, 'DATOS_INVALIDOS');
+
+  let vacia = '';
+  try {
+    await agregarEvidencia(
+      { placa: 'MOT100', tipo: 'CONEXION', contenido: Buffer.alloc(0) },
+      cajero.id,
+    );
+  } catch (e) {
+    vacia = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('una foto vacia se rechaza', vacia, 'DATOS_INVALIDOS');
+
+  const subida = await agregarEvidencia(
+    { placa: 'MOT100', tipo: 'CONEXION', contenido: png, descripcion: 'Detras del faro' },
+    cajero.id,
+  );
+  comprobar('la primera foto no sustituye nada', subida.sustituidas, 0);
+
+  const guardadas = await evidenciaDe('mot 100');
+  comprobar('la foto queda guardada', guardadas.length, 1);
+  comprobar('con su tipo reconocido por los bytes', guardadas[0]?.tipoMime, 'image/png');
+  comprobar('y su descripcion', guardadas[0]?.descripcion, 'Detras del faro');
+
+  comprobar(
+    'subir evidencia cuenta como revision',
+    (await obtenerMoto('MOT100')).gpsRevisadoEn !== null,
+    true,
+  );
+
+  const bytes = await bytesDeEvidencia(guardadas[0]!.id);
+  comprobar('los bytes vuelven intactos', bytes?.contenido.equals(png), true);
+
+  // El tope: la septima foto bota la mas vieja.
+  for (let i = 0; i < 6; i += 1) {
+    await agregarEvidencia({ placa: 'MOT100', tipo: 'OTRO', contenido: png }, cajero.id);
+  }
+  comprobar('no se acumulan mas de seis fotos', (await evidenciaDe('MOT100')).length, 6);
+  comprobar(
+    'y la primera fue la que salio',
+    (await bytesDeEvidencia(guardadas[0]!.id)) === null,
+    true,
+  );
+
+  // Quitar el GPS no borra la historia de que estuvo puesto.
+  await guardarDatosGps('MOT100', { tieneGps: false }, cajero.id);
+  comprobar('quitar el GPS no borra la evidencia', (await evidenciaDe('MOT100')).length, 6);
+  comprobar('pero la moto queda sin GPS', (await obtenerMoto('MOT100')).tieneGps, false);
+
+  const borrable = (await evidenciaDe('MOT100'))[0]!;
+  await borrarEvidencia(borrable.id, cajero.id);
+  comprobar('una foto se puede borrar a mano', (await evidenciaDe('MOT100')).length, 5);
 
   // -------------------------------------------------------------------------
   console.log('\n--- Auditoria ---');

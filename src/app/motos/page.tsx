@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 
 import { GrillaFlota } from '@/components/GrillaFlota';
 import { alertasDeFlota } from '@/server/services/mantenimiento';
+import { evidenciaDe, type EvidenciaGps } from '@/server/services/gps';
 import { choferesSinMoto, listarFlota } from '@/server/services/motos';
 import { cajeroDeSesion } from '@/server/services/sesion';
 
@@ -25,6 +26,13 @@ export default async function Motos() {
     alertasDeFlota(),
     choferesSinMoto(),
   ]);
+
+  // Solo se piden las fotos de las motos que llevan GPS: traerlas todas seria
+  // consultar de mas en el 90 % de los casos.
+  const evidenciaGps: Record<string, EvidenciaGps[]> = {};
+  for (const moto of flota.filter((m) => m.tieneGps)) {
+    evidenciaGps[moto.placa] = await evidenciaDe(moto.placa);
+  }
 
   const operativas = flota.filter((m) => m.estado === 'OPERATIVA').length;
   const vencidas = alertas.filter((a) => a.nivel === 'VENCIDO').length;
@@ -61,7 +69,12 @@ export default async function Motos() {
         </div>
       </div>
 
-      <GrillaFlota flota={flota} alertas={alertas} choferesLibres={choferesLibres} />
+      <GrillaFlota
+        flota={flota}
+        alertas={alertas}
+        choferesLibres={choferesLibres}
+        evidenciaGps={evidenciaGps}
+      />
     </main>
   );
 }

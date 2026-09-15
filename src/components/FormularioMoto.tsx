@@ -21,6 +21,8 @@
 import { useState } from 'react';
 
 import { ModalNumero } from '@/components/ModalNumero';
+import { PanelGps, type DatosGpsFormulario } from '@/components/PanelGps';
+import type { EvidenciaGps } from '@/server/services/gps';
 import type { MotoConAsignacion } from '@/server/services/motos';
 
 export interface DatosMoto {
@@ -43,6 +45,7 @@ export interface DatosMoto {
     vencimientoRtv: Date | null;
     vencimientoSeguro: Date | null;
   };
+  gps: DatosGpsFormulario;
 }
 
 interface Props {
@@ -50,6 +53,8 @@ interface Props {
   moto?: MotoConAsignacion | null;
   /** Ya existe una comodin en la flota, asi que no se puede marcar otra. */
   hayComodin: boolean;
+  /** Fotos del GPS de esta moto. Vacio cuando se esta creando. */
+  evidenciaGps?: EvidenciaGps[];
   enProceso: boolean;
   error: string | null;
   alGuardar: (datos: DatosMoto) => void;
@@ -88,6 +93,7 @@ function aFecha(texto: string): Date | null {
 export function FormularioMoto({
   moto,
   hayComodin,
+  evidenciaGps = [],
   enProceso,
   error,
   alGuardar,
@@ -95,7 +101,7 @@ export function FormularioMoto({
 }: Props) {
   const editando = Boolean(moto);
 
-  const [pestana, setPestana] = useState<'GENERAL' | 'TECNICA'>('GENERAL');
+  const [pestana, setPestana] = useState<'GENERAL' | 'TECNICA' | 'GPS'>('GENERAL');
 
   const [placa, setPlaca] = useState(moto?.placa ?? '');
   const [marca, setMarca] = useState(moto?.marca ?? '');
@@ -117,6 +123,13 @@ export function FormularioMoto({
   const [cadena, setCadena] = useState(moto?.medidaCadena ?? '');
   const [rtv, setRtv] = useState(aTextoDeFecha(moto?.vencimientoRtv ?? null));
   const [seguro, setSeguro] = useState(aTextoDeFecha(moto?.vencimientoSeguro ?? null));
+
+  const [gps, setGps] = useState<DatosGpsFormulario>({
+    tieneGps: moto?.tieneGps ?? false,
+    proveedor: moto?.gpsProveedor ?? '',
+    identificador: moto?.gpsIdentificador ?? '',
+    notas: moto?.gpsNotas ?? '',
+  });
 
   const [tecleando, setTecleando] = useState<'KM' | 'INTERVALO' | null>(null);
 
@@ -182,6 +195,7 @@ export function FormularioMoto({
         vencimientoRtv: aFecha(rtv),
         vencimientoSeguro: aFecha(seguro),
       },
+      gps,
     });
   };
 
@@ -228,6 +242,11 @@ export function FormularioMoto({
             activa={pestana === 'TECNICA'}
             onClick={() => setPestana('TECNICA')}
             etiqueta="🛠️ Ficha tecnica"
+          />
+          <Pestana
+            activa={pestana === 'GPS'}
+            onClick={() => setPestana('GPS')}
+            etiqueta="📡 GPS"
           />
         </div>
 
@@ -320,7 +339,7 @@ export function FormularioMoto({
                 </span>
               </button>
             </div>
-          ) : (
+          ) : pestana === 'TECNICA' ? (
             <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <Campo etiqueta="Tipo de aceite">
@@ -417,6 +436,15 @@ export function FormularioMoto({
                 />
               </Campo>
             </div>
+          ) : (
+            <PanelGps
+              placa={moto?.placa ?? null}
+              revisadoEn={moto?.gpsRevisadoEn ?? null}
+              evidencia={evidenciaGps}
+              valores={gps}
+              alCambiar={setGps}
+              bloqueado={enProceso}
+            />
           )}
 
           {error ? (

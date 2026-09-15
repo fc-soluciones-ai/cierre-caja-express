@@ -64,6 +64,7 @@ model Cajero {
   eventos       EventoAuditoria[]
   sesiones      Sesion[]
   mantenimiento RegistroMantenimiento[]
+  fotosGps      FotoGps[]
 
   @@map("cajeros")
 }
@@ -348,7 +349,7 @@ model Tiquete {
 model EventoAuditoria {
   id          String   @id @default(cuid())
   timestamp   DateTime @default(now())
-  tipo        String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | PIN_CAMBIADO | RESPALDO | MOTO_CREADA | MOTO_EDITADA | MOTO_ESTADO | MOTO_ASIGNADA | MOTO_LIBERADA | MANTENIMIENTO
+  tipo        String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | PIN_CAMBIADO | RESPALDO | MOTO_CREADA | MOTO_EDITADA | MOTO_ESTADO | MOTO_ASIGNADA | MOTO_LIBERADA | MANTENIMIENTO | GPS_EVIDENCIA
   cajeroId    String?  @map("cajero_id")
   choferId    String?  @map("chofer_id")
   entidadTipo String?  @map("entidad_tipo")
@@ -435,15 +436,71 @@ model Motocicleta {
   /// Marchamo y seguro obligatorio.
   vencimientoSeguro DateTime? @map("vencimiento_seguro")
 
+  // --- Rastreo satelital ---------------------------------------------------
+
+  tieneGps Boolean @default(false) @map("tiene_gps")
+
+  /// Empresa que presta el rastreo.
+  gpsProveedor String? @map("gps_proveedor")
+
+  /// IMEI o numero de unidad, el que haya que dictar para dar de baja el robo.
+  gpsIdentificador String? @map("gps_identificador")
+
+  gpsNotas String? @map("gps_notas")
+
+  /// Ultima vez que alguien comprobo que el equipo estaba conectado y con
+  /// corriente. Se pone sola al subir una foto de evidencia.
+  gpsRevisadoEn DateTime? @map("gps_revisado_en")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   asignaciones  AsignacionMoto[]
   mantenimiento RegistroMantenimiento[]
+  fotosGps      FotoGps[]
 
   @@index([estado])
   @@index([esComodin])
   @@map("motocicletas")
+}
+
+/// Evidencia de que el rastreador esta puesto, conectado y con corriente.
+///
+/// POR QUE LA IMAGEN VIVE EN LA BASE Y NO EN UN ARCHIVO
+///
+/// Las fotos de los repartidores se guardan en public/ porque el sistema
+/// nacio para un solo punto de caja con su disco. Al publicarlo en Vercel eso
+/// dejo de servir: ahi el disco es de solo lectura y lo que se escriba
+/// desaparece en el siguiente despliegue.
+///
+/// Una evidencia que desaparece no es una evidencia. Por eso estas imagenes
+/// van en la base: viajan en el respaldo, se ven igual desde el local y desde
+/// la oficina del cliente, y no dependen de que exista un disco.
+///
+/// A cambio hay que cuidarles el tamano. Ver MAXIMO_BYTES y MAXIMO_POR_MOTO
+/// en services/gps.ts.
+model FotoGps {
+  id    String      @id @default(cuid())
+  placa String
+  moto  Motocicleta @relation(fields: [placa], references: [placa], onDelete: Cascade)
+
+  /// CONEXION | CORRIENTE | OTRO
+  tipo String
+
+  /// Bytes de la imagen. El formato se decide por los bytes, no por lo que
+  /// declare el navegador.
+  contenido Bytes
+  tipoMime  String @map("tipo_mime")
+
+  /// Lo que el cajero anoto al subirla: "detras del faro", "fusible nuevo".
+  descripcion String?
+
+  tomadaEn DateTime @default(now()) @map("tomada_en")
+  cajeroId String   @map("cajero_id")
+  cajero   Cajero   @relation(fields: [cajeroId], references: [id])
+
+  @@index([placa, tomadaEn])
+  @@map("fotos_gps")
 }
 
 /// Quien anduvo en cual moto y desde cuando.

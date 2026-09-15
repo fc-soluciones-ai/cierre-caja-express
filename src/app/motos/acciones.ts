@@ -25,6 +25,13 @@ import {
   type ResultadoAsignacion,
   type ResultadoCambioEstado,
 } from '@/server/services/motos';
+import {
+  agregarEvidencia,
+  borrarEvidencia,
+  guardarDatosGps,
+  type DatosGps,
+  type TipoEvidencia,
+} from '@/server/services/gps';
 import { exigirCajero } from '@/server/services/sesion';
 import type { CategoriaMantenimiento, EstadoMoto, TipoMantenimiento } from '@/types/enums';
 
@@ -141,6 +148,66 @@ export async function accionRegistrarGasto(entrada: {
     const resultado = await registrarMantenimiento({ ...entrada, cajeroId: cajero.id });
     refrescar();
     return { ok: true, datos: resultado };
+  } catch (e) {
+    return comoResultado(e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rastreo satelital
+// ---------------------------------------------------------------------------
+
+export async function accionGuardarGps(
+  placa: string,
+  datos: DatosGps,
+): Promise<Resultado<null>> {
+  try {
+    const cajero = await exigirCajero();
+    await guardarDatosGps(placa, datos, cajero.id);
+    refrescar();
+    return { ok: true, datos: null };
+  } catch (e) {
+    return comoResultado(e);
+  }
+}
+
+/**
+ * Sube una foto de evidencia.
+ *
+ * Viaja como FormData y no como un arreglo de numeros: convertir tres
+ * megabytes de imagen a JSON los infla a mas del triple y los hace pasar por
+ * el serializador de las acciones de servidor.
+ */
+export async function accionSubirEvidenciaGps(
+  formulario: FormData,
+): Promise<Resultado<{ id: string; sustituidas: number }>> {
+  try {
+    const cajero = await exigirCajero();
+
+    const placa = String(formulario.get('placa') ?? '');
+    const tipo = String(formulario.get('tipo') ?? '') as TipoEvidencia;
+    const descripcion = String(formulario.get('descripcion') ?? '');
+    const archivo = formulario.get('archivo');
+
+    if (!(archivo instanceof File) || archivo.size === 0) {
+      return { ok: false, mensaje: 'Elija una foto.' };
+    }
+
+    const contenido = Buffer.from(await archivo.arrayBuffer());
+    const resultado = await agregarEvidencia({ placa, tipo, contenido, descripcion }, cajero.id);
+    refrescar();
+    return { ok: true, datos: resultado };
+  } catch (e) {
+    return comoResultado(e);
+  }
+}
+
+export async function accionBorrarEvidenciaGps(id: string): Promise<Resultado<null>> {
+  try {
+    const cajero = await exigirCajero();
+    await borrarEvidencia(id, cajero.id);
+    refrescar();
+    return { ok: true, datos: null };
   } catch (e) {
     return comoResultado(e);
   }

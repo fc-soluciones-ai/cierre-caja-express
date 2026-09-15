@@ -67,6 +67,11 @@ export interface MotoConAsignacion {
   medidaCadena: string | null;
   vencimientoRtv: Date | null;
   vencimientoSeguro: Date | null;
+  tieneGps: boolean;
+  gpsProveedor: string | null;
+  gpsIdentificador: string | null;
+  gpsNotas: string | null;
+  gpsRevisadoEn: Date | null;
   /** Chofer que la trae hoy, si alguno. */
   choferId: string | null;
   choferNombre: string | null;
@@ -100,6 +105,11 @@ function aVista(
     medidaCadena: moto.medidaCadena,
     vencimientoRtv: moto.vencimientoRtv,
     vencimientoSeguro: moto.vencimientoSeguro,
+    tieneGps: moto.tieneGps,
+    gpsProveedor: moto.gpsProveedor,
+    gpsIdentificador: moto.gpsIdentificador,
+    gpsNotas: moto.gpsNotas,
+    gpsRevisadoEn: moto.gpsRevisadoEn,
     choferId: vigente?.choferId ?? null,
     choferNombre: vigente?.chofer.nombre ?? null,
     tipoAsignacion: vigente?.tipo ?? null,

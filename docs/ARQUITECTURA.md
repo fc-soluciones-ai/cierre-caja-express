@@ -424,6 +424,33 @@ se leen en voz alta.
 El intervalo de cambio de aceite vive en la ficha y manda sobre el general.
 Una moto vieja o de mucha carga puede pedirlo antes de los 2.000 km.
 
+### Rastreo satelital y su evidencia
+
+Lo que se vigila no es que la moto **tenga** un GPS instalado, sino que alguien
+haya comprobado hace poco que sigue conectado y con corriente. Un rastreador
+desenchufado se ve igual que uno funcionando hasta el día que se roban la
+moto. Por eso cada foto que se sube mueve la fecha de última revisión.
+
+Se guardan el proveedor, el IMEI o número de unidad (el que hay que dictar por
+teléfono para reportar un robo), y notas de dónde va escondido el equipo.
+
+**Las imágenes viven en la base de datos, no en un archivo.** Las fotos de los
+repartidores se escriben en `public/`, que servía cuando el sistema corría en
+un solo punto de caja con su disco. En Vercel ese disco es de solo lectura y
+lo que se escriba desaparece en el siguiente despliegue. Una evidencia que
+desaparece no es una evidencia.
+
+A cambio hay que cuidarles el tamaño: 3 MB por foto y las 6 más recientes por
+moto. Al pasarse, sale la más vieja. La evidencia que interesa es la reciente.
+
+Las fotos se sirven por `/api/gps/[id]`, que exige sesión. Muestran dónde va
+escondido el rastreador de una moto; no son algo que deba poder ver cualquiera
+que dé con la dirección.
+
+Quitar el GPS de una moto no borra sus fotos. Son la prueba de que en su
+momento estuvo puesto, y esa historia no debería desaparecer porque alguien
+desmarque una casilla.
+
 ### Dos clases de alerta
 
 El aceite vence por kilómetros rodados; la revisión técnica vence por
@@ -461,7 +488,7 @@ cero: cero significaría que rodar no cuesta nada.
 
 ## 12. Estado actual
 
-Terminado y verificado con 198 comprobaciones automáticas más pruebas manuales
+Terminado y verificado con 214 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.
