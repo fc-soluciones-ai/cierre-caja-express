@@ -20,6 +20,7 @@ import {
   accionBorrarEvidenciaGps,
   accionSubirEvidenciaGps,
 } from '@/app/motos/acciones';
+import { encogerImagen } from '@/lib/imagen';
 import type { EvidenciaGps, TipoEvidencia } from '@/server/services/gps';
 
 const TIPOS: Array<{ valor: TipoEvidencia; etiqueta: string; icono: string; nota: string }> = [
@@ -91,11 +92,15 @@ export function PanelGps({
       setError(null);
       setAviso(null);
 
+      // Se encoge antes de mandarla: la camara entrega megabytes para una
+      // miniatura, y estas fotos van a la base de datos.
+      const encogida = await encogerImagen(archivo);
+
       const cuerpo = new FormData();
       cuerpo.set('placa', placa);
       cuerpo.set('tipo', tipo);
       cuerpo.set('descripcion', descripcion);
-      cuerpo.set('archivo', archivo);
+      cuerpo.set('archivo', encogida, encogida.name);
 
       const respuesta = await accionSubirEvidenciaGps(cuerpo);
       setSubiendo(false);
@@ -274,7 +279,7 @@ export function PanelGps({
               </button>
 
               <p className="mt-2 text-center text-xs text-slate-500">
-                JPG, PNG o WEBP, hasta 3 MB. Se conservan las 6 mas recientes.
+                Se encoge sola antes de subirla. Se conservan las 6 mas recientes.
               </p>
             </div>
           )}

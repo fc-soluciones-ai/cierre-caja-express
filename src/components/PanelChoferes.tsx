@@ -16,6 +16,7 @@ import {
   accionCrearChofer,
   accionEditarChofer,
 } from '@/app/repartidores/acciones';
+import { encogerImagen } from '@/lib/imagen';
 import { clasificarDiferencia, formatearMoneda } from '@/lib/money/money';
 import type { ChoferConHistoria } from '@/server/services/choferes';
 
@@ -251,6 +252,14 @@ function ModalChofer({
       setError(null);
 
       const datos = new FormData(evento.currentTarget);
+
+      // La camara del celular entrega tres o cuatro megabytes para un
+      // cuadro de 96 pixeles. Se encoge antes de mandarla.
+      const elegida = datos.get('foto');
+      if (elegida instanceof File && elegida.size > 0) {
+        const encogida = await encogerImagen(elegida);
+        datos.set('foto', encogida, encogida.name);
+      }
       const respuesta =
         formulario.modo === 'CREAR'
           ? await accionCrearChofer(datos)
@@ -319,7 +328,7 @@ function ModalChofer({
             >
               {vistaPrevia ? 'Cambiar foto' : 'Subir foto'}
             </button>
-            <p className="mt-2 text-xs text-slate-500">JPG, PNG o WEBP, hasta 4 MB.</p>
+            <p className="mt-2 text-xs text-slate-500">JPG, PNG o WEBP. Se encoge sola antes de subirla.</p>
           </div>
         </div>
 
