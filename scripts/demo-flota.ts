@@ -28,6 +28,9 @@ const PIN_DEMO = '2026';
 async function main(): Promise<void> {
   exigirBaseDePruebas();
 
+  // La evidencia va primero: apunta al cajero que la subio, y la base no
+  // deja borrar ese cajero mientras siga habiendo fotos suyas.
+  await prisma.evidencia.deleteMany();
   await prisma.registroMantenimiento.deleteMany();
   await prisma.asignacionMoto.deleteMany();
   await prisma.motocicleta.deleteMany();
