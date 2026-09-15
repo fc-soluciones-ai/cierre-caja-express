@@ -15,6 +15,8 @@ import { useRouter } from 'next/navigation';
 
 import { accionRegistrarGasto } from '@/app/motos/acciones';
 import { ModalNumero } from '@/components/ModalNumero';
+import { PanelEvidencia } from '@/components/PanelEvidencia';
+import { TIPOS_DE_FOTO, type Evidencia } from '@/server/services/evidencia';
 import { formatearMoneda } from '@/lib/money/money';
 import type { MotoConAsignacion } from '@/server/services/motos';
 import type { CategoriaMantenimiento, TipoMantenimiento } from '@/types/enums';
@@ -61,7 +63,12 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
   const [editando, setEditando] = useState<Editando>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmado, setConfirmado] = useState<{ placa: string; km: number } | null>(null);
+  const [confirmado, setConfirmado] = useState<{
+    id: string;
+    placa: string;
+    km: number;
+  } | null>(null);
+  const [fotos, setFotos] = useState<Evidencia[]>([]);
 
   // Una sola clave mientras el formulario siga abierto: es lo que evita
   // registrar dos veces el mismo tanque de gasolina si el dedo rebota.
@@ -92,7 +99,12 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
       return;
     }
 
-    setConfirmado({ placa: respuesta.datos.placa, km: respuesta.datos.kilometrajeActualizado });
+    setConfirmado({
+      id: respuesta.datos.id,
+      placa: respuesta.datos.placa,
+      km: respuesta.datos.kilometrajeActualizado,
+    });
+    setFotos([]);
     setEnviando(false);
     router.refresh();
   }, [categoria, definicion, descripcion, enviando, kilometraje, monto, moto, proveedor, router]);
@@ -107,6 +119,21 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
           {formatearMoneda(confirmado.km * 100, { conSimbolo: false })} km
         </p>
 
+        <div className="mt-6 text-left">
+          <p className="text-center text-sm text-slate-400">
+            Agreguele la foto ahora, mientras tiene la moto delante.
+          </p>
+          <div className="mt-3">
+            <PanelEvidencia
+              entidadTipo="GASTO"
+              entidadId={confirmado.id}
+              tipos={TIPOS_DE_FOTO.GASTO}
+              evidencia={fotos}
+              alCambiar={() => setFotos([])}
+            />
+          </div>
+        </div>
+
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -119,6 +146,7 @@ export function FormularioGasto({ flota, placaInicial }: Props) {
               setProveedor('');
               setDescripcion('');
               setConfirmado(null);
+              setFotos([]);
             }}
           >
             Registrar otro

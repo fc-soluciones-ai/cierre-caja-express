@@ -66,6 +66,7 @@ function comprobar(descripcion: string, real: unknown, esperado: unknown): void 
 async function limpiar(): Promise<void> {
   // Las tablas de flota van primero: apuntan a choferes y borrarlas despues
   // hace fallar el borrado de choferes por llave foranea.
+  await prisma.evidencia.deleteMany();
   await prisma.registroMantenimiento.deleteMany();
   await prisma.asignacionMoto.deleteMany();
   await prisma.motocicleta.deleteMany();

@@ -64,7 +64,7 @@ model Cajero {
   eventos       EventoAuditoria[]
   sesiones      Sesion[]
   mantenimiento RegistroMantenimiento[]
-  fotosGps      FotoGps[]
+  evidencias    Evidencia[]
 
   @@map("cajeros")
 }
@@ -380,7 +380,7 @@ model Tiquete {
 model EventoAuditoria {
   id          String   @id @default(cuid())
   timestamp   DateTime @default(now())
-  tipo        String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | PIN_CAMBIADO | RESPALDO | MOTO_CREADA | MOTO_EDITADA | MOTO_ESTADO | MOTO_ASIGNADA | MOTO_LIBERADA | MANTENIMIENTO | GPS_EVIDENCIA
+  tipo        String // ABONO | ABONO_ANULADO | CARGA_EXCEL | CIERRE_CHOFER | ARQUEO | CHOFER_CREADO | CHOFER_EDITADO | CHOFER_DESACTIVADO | TURNO_ABIERTO | TURNO_CANCELADO | REIMPRESION | LOGIN | LOGIN_FALLIDO | CAJERO_BLOQUEADO | PIN_CAMBIADO | RESPALDO | MOTO_CREADA | MOTO_EDITADA | MOTO_ESTADO | MOTO_ASIGNADA | MOTO_LIBERADA | MANTENIMIENTO | EVIDENCIA
   cajeroId    String?  @map("cajero_id")
   choferId    String?  @map("chofer_id")
   entidadTipo String?  @map("entidad_tipo")
@@ -474,8 +474,12 @@ model Motocicleta {
   /// Empresa que presta el rastreo.
   gpsProveedor String? @map("gps_proveedor")
 
-  /// IMEI o numero de unidad, el que haya que dictar para dar de baja el robo.
+  /// IMEI del equipo: los quince digitos que lo identifican ante la red.
   gpsIdentificador String? @map("gps_identificador")
+
+  /// Correo de la cuenta donde el equipo reporta. Es con lo que se entra a la
+  /// plataforma del proveedor a ver donde anda la moto.
+  gpsCorreo String? @map("gps_correo")
 
   gpsNotas String? @map("gps_notas")
 
@@ -488,34 +492,46 @@ model Motocicleta {
 
   asignaciones  AsignacionMoto[]
   mantenimiento RegistroMantenimiento[]
-  fotosGps      FotoGps[]
 
   @@index([estado])
   @@index([esComodin])
   @@map("motocicletas")
 }
 
-/// Evidencia de que el rastreador esta puesto, conectado y con corriente.
+/// Evidencia fotografica de cualquier registro del sistema.
 ///
-/// POR QUE LA IMAGEN VIVE EN LA BASE Y NO EN UN ARCHIVO
+/// POR QUE UNA SOLA TABLA Y NO UNA POR CADA COSA
 ///
-/// Las fotos de los repartidores se guardan en public/ porque el sistema
-/// nacio para un solo punto de caja con su disco. Al publicarlo en Vercel eso
-/// dejo de servir: ahi el disco es de solo lectura y lo que se escriba
-/// desaparece en el siguiente despliegue.
+/// Empezo siendo solo del GPS. Despues hizo falta para el cambio de llantas,
+/// para el alta de una moto, para cada modificacion. Repetir la tabla por cada
+/// caso habria multiplicado el mismo codigo de validacion, la misma ruta que
+/// la sirve y el mismo tope de tamano, con tres oportunidades de que uno se
+/// quedara atras.
 ///
-/// Una evidencia que desaparece no es una evidencia. Por eso estas imagenes
-/// van en la base: viajan en el respaldo, se ven igual desde el local y desde
-/// la oficina del cliente, y no dependen de que exista un disco.
+/// Se apunta a la entidad por tipo e identificador, igual que eventos_auditoria.
+/// No hay llave foranea porque el destino cambia segun el tipo; a cambio, el
+/// borrado de la entidad tiene que llevarse su evidencia a mano.
 ///
-/// A cambio hay que cuidarles el tamano. Ver MAXIMO_BYTES y MAXIMO_POR_MOTO
-/// en services/gps.ts.
-model FotoGps {
-  id    String      @id @default(cuid())
-  placa String
-  moto  Motocicleta @relation(fields: [placa], references: [placa], onDelete: Cascade)
+/// POR QUE LA IMAGEN VIVE EN LA BASE
+///
+/// Las fotos se escribian en public/, que servia cuando esto corria en un solo
+/// punto de caja con su disco. En Vercel ese disco es de solo lectura y lo que
+/// se escriba desaparece en el siguiente despliegue. Una evidencia que
+/// desaparece no es una evidencia.
+///
+/// A cambio hay que cuidarles el tamano. El navegador las encoge antes de
+/// subirlas (ver lib/imagen.ts) y el servicio limita cuantas guarda por
+/// registro (ver services/evidencia.ts).
+model Evidencia {
+  id String @id @default(cuid())
 
-  /// CONEXION | CORRIENTE | OTRO
+  /// MOTOCICLETA | GASTO | GPS. Ver TIPOS_DE_ENTIDAD en services/evidencia.ts.
+  entidadTipo String @map("entidad_tipo")
+
+  /// La placa, el id del gasto, o la placa otra vez cuando es del GPS.
+  entidadId String @map("entidad_id")
+
+  /// Que muestra la foto. Los valores dependen del tipo de entidad.
   tipo String
 
   /// Bytes de la imagen. El formato se decide por los bytes, no por lo que
@@ -523,15 +539,15 @@ model FotoGps {
   contenido Bytes
   tipoMime  String @map("tipo_mime")
 
-  /// Lo que el cajero anoto al subirla: "detras del faro", "fusible nuevo".
+  /// Lo que el cajero anoto al subirla: "detras del faro", "llanta trasera".
   descripcion String?
 
   tomadaEn DateTime @default(now()) @map("tomada_en")
   cajeroId String   @map("cajero_id")
   cajero   Cajero   @relation(fields: [cajeroId], references: [id])
 
-  @@index([placa, tomadaEn])
-  @@map("fotos_gps")
+  @@index([entidadTipo, entidadId, tomadaEn])
+  @@map("evidencias")
 }
 
 /// Quien anduvo en cual moto y desde cuando.

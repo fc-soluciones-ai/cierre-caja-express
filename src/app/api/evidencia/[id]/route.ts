@@ -1,18 +1,18 @@
 /**
- * Sirve una foto de evidencia del GPS desde la base de datos.
+ * Sirve una foto de evidencia desde la base de datos.
  *
- * Existe porque las imagenes no son archivos: viven en la tabla fotos_gps,
+ * Existe porque las imagenes no son archivos: viven en la tabla evidencias,
  * para que sobrevivan a un despliegue y viajen en el respaldo. Ver
- * services/gps.ts.
+ * services/evidencia.ts.
  *
- * Exige sesion. Aunque adivinar un cuid es practicamente imposible, estas
- * fotos muestran donde va escondido el rastreador de una moto; no son algo
- * que deba poder ver cualquiera que dé con la direccion.
+ * Exige sesion. Estas fotos muestran donde va escondido el rastreador de una
+ * moto, el estado en que se recibio, o la factura de un taller; no son algo
+ * que deba poder ver cualquiera que de con la direccion.
  */
 
 import { NextResponse } from 'next/server';
 
-import { bytesDeEvidencia } from '@/server/services/gps';
+import { bytesDeEvidencia } from '@/server/services/evidencia';
 import { cajeroDeSesion } from '@/server/services/sesion';
 
 export const dynamic = 'force-dynamic';

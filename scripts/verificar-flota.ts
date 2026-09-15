@@ -14,9 +14,10 @@ import {
   agregarEvidencia,
   borrarEvidencia,
   bytesDeEvidencia,
+  conteoDeEvidencia,
   evidenciaDe,
-  guardarDatosGps,
-} from '@/server/services/gps';
+} from '@/server/services/evidencia';
+import { guardarDatosGps } from '@/server/services/gps';
 import {
   alertasDeFlota,
   registrarMantenimiento,
@@ -46,6 +47,7 @@ function comprobar(descripcion: string, real: unknown, esperado: unknown): void 
 }
 
 async function limpiar(): Promise<void> {
+  await prisma.evidencia.deleteMany();
   await prisma.registroMantenimiento.deleteMany();
   await prisma.asignacionMoto.deleteMany();
   await prisma.motocicleta.deleteMany();
@@ -436,18 +438,37 @@ async function main(): Promise<void> {
 
   await guardarDatosGps(
     'MOT100',
-    { tieneGps: true, proveedor: '  Rastreo SA  ', identificador: '350612345678901' },
+    {
+      tieneGps: true,
+      proveedor: '  Rastreo SA  ',
+      identificador: '350612345678901',
+      correo: 'flota@pizzeria.cr',
+    },
     cajero.id,
   );
   const conGps = await obtenerMoto('MOT100');
   comprobar('queda marcada con GPS', conGps.tieneGps, true);
   comprobar('el proveedor se limpia', conGps.gpsProveedor, 'Rastreo SA');
+  comprobar('el correo de la cuenta se guarda', conGps.gpsCorreo, 'flota@pizzeria.cr');
   comprobar('sin foto todavia no hay revision', conGps.gpsRevisadoEn, null);
+
+  let correoMalo = '';
+  try {
+    await guardarDatosGps('MOT100', { tieneGps: true, correo: 'esto no es correo' }, cajero.id);
+  } catch (e) {
+    correoMalo = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('un correo con dedazo se rechaza', correoMalo, 'DATOS_INVALIDOS');
 
   let noEsImagen = '';
   try {
     await agregarEvidencia(
-      { placa: 'MOT100', tipo: 'CONEXION', contenido: Buffer.from('esto no es una foto') },
+      {
+        entidadTipo: 'GPS',
+        entidadId: 'MOT100',
+        tipo: 'CONEXION',
+        contenido: Buffer.from('esto no es una foto'),
+      },
       cajero.id,
     );
   } catch (e) {
@@ -458,7 +479,7 @@ async function main(): Promise<void> {
   let vacia = '';
   try {
     await agregarEvidencia(
-      { placa: 'MOT100', tipo: 'CONEXION', contenido: Buffer.alloc(0) },
+      { entidadTipo: 'GPS', entidadId: 'MOT100', tipo: 'CONEXION', contenido: Buffer.alloc(0) },
       cajero.id,
     );
   } catch (e) {
@@ -467,12 +488,18 @@ async function main(): Promise<void> {
   comprobar('una foto vacia se rechaza', vacia, 'DATOS_INVALIDOS');
 
   const subida = await agregarEvidencia(
-    { placa: 'MOT100', tipo: 'CONEXION', contenido: png, descripcion: 'Detras del faro' },
+    {
+      entidadTipo: 'GPS',
+      entidadId: 'MOT100',
+      tipo: 'CONEXION',
+      contenido: png,
+      descripcion: 'Detras del faro',
+    },
     cajero.id,
   );
   comprobar('la primera foto no sustituye nada', subida.sustituidas, 0);
 
-  const guardadas = await evidenciaDe('mot 100');
+  const guardadas = await evidenciaDe('GPS', 'MOT100');
   comprobar('la foto queda guardada', guardadas.length, 1);
   comprobar('con su tipo reconocido por los bytes', guardadas[0]?.tipoMime, 'image/png');
   comprobar('y su descripcion', guardadas[0]?.descripcion, 'Detras del faro');
@@ -486,11 +513,25 @@ async function main(): Promise<void> {
   const bytes = await bytesDeEvidencia(guardadas[0]!.id);
   comprobar('los bytes vuelven intactos', bytes?.contenido.equals(png), true);
 
+  let tipoAjeno = '';
+  try {
+    await agregarEvidencia(
+      { entidadTipo: 'GPS', entidadId: 'MOT100', tipo: 'FACTURA', contenido: png },
+      cajero.id,
+    );
+  } catch (e) {
+    tipoAjeno = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('un tipo de foto de otra entidad se rechaza', tipoAjeno, 'DATOS_INVALIDOS');
+
   // El tope: la septima foto bota la mas vieja.
   for (let i = 0; i < 6; i += 1) {
-    await agregarEvidencia({ placa: 'MOT100', tipo: 'OTRO', contenido: png }, cajero.id);
+    await agregarEvidencia(
+      { entidadTipo: 'GPS', entidadId: 'MOT100', tipo: 'OTRO', contenido: png },
+      cajero.id,
+    );
   }
-  comprobar('no se acumulan mas de seis fotos', (await evidenciaDe('MOT100')).length, 6);
+  comprobar('no se acumulan mas de seis fotos', (await evidenciaDe('GPS', 'MOT100')).length, 6);
   comprobar(
     'y la primera fue la que salio',
     (await bytesDeEvidencia(guardadas[0]!.id)) === null,
@@ -499,12 +540,66 @@ async function main(): Promise<void> {
 
   // Quitar el GPS no borra la historia de que estuvo puesto.
   await guardarDatosGps('MOT100', { tieneGps: false }, cajero.id);
-  comprobar('quitar el GPS no borra la evidencia', (await evidenciaDe('MOT100')).length, 6);
+  comprobar('quitar el GPS no borra la evidencia', (await evidenciaDe('GPS', 'MOT100')).length, 6);
   comprobar('pero la moto queda sin GPS', (await obtenerMoto('MOT100')).tieneGps, false);
 
-  const borrable = (await evidenciaDe('MOT100'))[0]!;
+  const borrable = (await evidenciaDe('GPS', 'MOT100'))[0]!;
   await borrarEvidencia(borrable.id, cajero.id);
-  comprobar('una foto se puede borrar a mano', (await evidenciaDe('MOT100')).length, 5);
+  comprobar('una foto se puede borrar a mano', (await evidenciaDe('GPS', 'MOT100')).length, 5);
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- Evidencia de otros registros ---');
+
+  const gasto = await registrarMantenimiento({
+    placa: 'MOT200',
+    tipo: 'PREVENTIVO',
+    categoria: 'LLANTAS',
+    costoTotal: 4_500_000,
+    kilometrajeEvento: 45_000,
+    cajeroId: cajero.id,
+  });
+
+  await agregarEvidencia(
+    { entidadTipo: 'GASTO', entidadId: gasto.id, tipo: 'ANTES', contenido: png },
+    cajero.id,
+  );
+  await agregarEvidencia(
+    { entidadTipo: 'GASTO', entidadId: gasto.id, tipo: 'FACTURA', contenido: png },
+    cajero.id,
+  );
+  comprobar('el gasto guarda su evidencia', (await evidenciaDe('GASTO', gasto.id)).length, 2);
+
+  await agregarEvidencia(
+    { entidadTipo: 'MOTOCICLETA', entidadId: 'MOT200', tipo: 'ESTADO', contenido: png },
+    cajero.id,
+  );
+  comprobar('la moto guarda la suya', (await evidenciaDe('MOTOCICLETA', 'MOT200')).length, 1);
+  comprobar('y cada una va por su lado', (await evidenciaDe('GPS', 'MOT200')).length, 0);
+
+  // El gasto no rota: al llegar al tope avisa en vez de botar un comprobante.
+  await agregarEvidencia(
+    { entidadTipo: 'GASTO', entidadId: gasto.id, tipo: 'DESPUES', contenido: png },
+    cajero.id,
+  );
+  await agregarEvidencia(
+    { entidadTipo: 'GASTO', entidadId: gasto.id, tipo: 'ODOMETRO', contenido: png },
+    cajero.id,
+  );
+  let gastoLleno = '';
+  try {
+    await agregarEvidencia(
+      { entidadTipo: 'GASTO', entidadId: gasto.id, tipo: 'ANTES', contenido: png },
+      cajero.id,
+    );
+  } catch (e) {
+    gastoLleno = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('el gasto no bota comprobantes al llenarse', gastoLleno, 'DATOS_INVALIDOS');
+  comprobar('y conserva las cuatro', (await evidenciaDe('GASTO', gasto.id)).length, 4);
+
+  const conteo = await conteoDeEvidencia('GASTO', [gasto.id, 'inventado']);
+  comprobar('el conteo sin traer los bytes cuadra', conteo[gasto.id], 4);
+  comprobar('y no inventa registros', conteo['inventado'], undefined);
 
   // -------------------------------------------------------------------------
   console.log('\n--- Auditoria ---');
@@ -515,7 +610,7 @@ async function main(): Promise<void> {
   // Cinco gastos, no seis: el envio repetido por idempotencia no crea otro
   // registro y por tanto tampoco otro evento. El rechazado por odometro hacia
   // atras tampoco deja rastro, porque nunca llego a escribirse.
-  comprobar('los gastos, sin contar el repetido', porTipo['MANTENIMIENTO'], 5);
+  comprobar('los gastos, sin contar el repetido', porTipo['MANTENIMIENTO'], 6);
   comprobar('y las asignaciones', (porTipo['MOTO_ASIGNADA'] ?? 0) > 0, true);
 
   const historial = await prisma.asignacionMoto.count();

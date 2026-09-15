@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Alta y edicion de una moto, en dos pestanas.
+ * Alta y edicion de una moto, en cuatro pestanas.
  *
  * Datos generales es lo que hace falta para que la moto exista y ruede. Ficha
  * tecnica es lo que alguien necesita saber parado frente al mostrador del
@@ -22,7 +22,8 @@ import { useState } from 'react';
 
 import { ModalNumero } from '@/components/ModalNumero';
 import { PanelGps, type DatosGpsFormulario } from '@/components/PanelGps';
-import type { EvidenciaGps } from '@/server/services/gps';
+import { PanelEvidencia } from '@/components/PanelEvidencia';
+import { TIPOS_DE_FOTO, type Evidencia } from '@/server/services/evidencia';
 import type { MotoConAsignacion } from '@/server/services/motos';
 
 export interface DatosMoto {
@@ -54,7 +55,9 @@ interface Props {
   /** Ya existe una comodin en la flota, asi que no se puede marcar otra. */
   hayComodin: boolean;
   /** Fotos del GPS de esta moto. Vacio cuando se esta creando. */
-  evidenciaGps?: EvidenciaGps[];
+  evidenciaGps?: Evidencia[];
+  /** Fotos de la moto en si: estado, odometro, danos. */
+  evidenciaMoto?: Evidencia[];
   enProceso: boolean;
   error: string | null;
   alGuardar: (datos: DatosMoto) => void;
@@ -94,6 +97,7 @@ export function FormularioMoto({
   moto,
   hayComodin,
   evidenciaGps = [],
+  evidenciaMoto = [],
   enProceso,
   error,
   alGuardar,
@@ -101,7 +105,7 @@ export function FormularioMoto({
 }: Props) {
   const editando = Boolean(moto);
 
-  const [pestana, setPestana] = useState<'GENERAL' | 'TECNICA' | 'GPS'>('GENERAL');
+  const [pestana, setPestana] = useState<'GENERAL' | 'TECNICA' | 'GPS' | 'FOTOS'>('GENERAL');
 
   const [placa, setPlaca] = useState(moto?.placa ?? '');
   const [marca, setMarca] = useState(moto?.marca ?? '');
@@ -128,6 +132,7 @@ export function FormularioMoto({
     tieneGps: moto?.tieneGps ?? false,
     proveedor: moto?.gpsProveedor ?? '',
     identificador: moto?.gpsIdentificador ?? '',
+    correo: moto?.gpsCorreo ?? '',
     notas: moto?.gpsNotas ?? '',
   });
 
@@ -247,6 +252,11 @@ export function FormularioMoto({
             activa={pestana === 'GPS'}
             onClick={() => setPestana('GPS')}
             etiqueta="📡 GPS"
+          />
+          <Pestana
+            activa={pestana === 'FOTOS'}
+            onClick={() => setPestana('FOTOS')}
+            etiqueta="📷 Fotos"
           />
         </div>
 
@@ -436,7 +446,7 @@ export function FormularioMoto({
                 />
               </Campo>
             </div>
-          ) : (
+          ) : pestana === 'GPS' ? (
             <PanelGps
               placa={moto?.placa ?? null}
               revisadoEn={moto?.gpsRevisadoEn ?? null}
@@ -444,6 +454,15 @@ export function FormularioMoto({
               valores={gps}
               alCambiar={setGps}
               bloqueado={enProceso}
+            />
+          ) : (
+            <PanelEvidencia
+              entidadTipo="MOTOCICLETA"
+              entidadId={moto?.placa ?? null}
+              tipos={TIPOS_DE_FOTO.MOTOCICLETA}
+              evidencia={evidenciaMoto}
+              bloqueado={enProceso}
+              avisoSinRegistro="Guarde la moto primero. Despues podra adjuntarle fotos de como esta."
             />
           )}
 

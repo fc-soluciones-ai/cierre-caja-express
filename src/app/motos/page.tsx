@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 
 import { GrillaFlota } from '@/components/GrillaFlota';
 import { alertasDeFlota } from '@/server/services/mantenimiento';
-import { evidenciaDe, type EvidenciaGps } from '@/server/services/gps';
+import { evidenciaDe, type Evidencia } from '@/server/services/evidencia';
 import { choferesSinMoto, listarFlota } from '@/server/services/motos';
 import { cajeroDeSesion } from '@/server/services/sesion';
 
@@ -27,11 +27,13 @@ export default async function Motos() {
     choferesSinMoto(),
   ]);
 
-  // Solo se piden las fotos de las motos que llevan GPS: traerlas todas seria
-  // consultar de mas en el 90 % de los casos.
-  const evidenciaGps: Record<string, EvidenciaGps[]> = {};
-  for (const moto of flota.filter((m) => m.tieneGps)) {
-    evidenciaGps[moto.placa] = await evidenciaDe(moto.placa);
+  // Las fotos se piden por moto. Son pocas motos y solo se usan al abrir el
+  // formulario, asi que no vale la pena una consulta mas fina.
+  const evidenciaGps: Record<string, Evidencia[]> = {};
+  const evidenciaMoto: Record<string, Evidencia[]> = {};
+  for (const moto of flota) {
+    if (moto.tieneGps) evidenciaGps[moto.placa] = await evidenciaDe('GPS', moto.placa);
+    evidenciaMoto[moto.placa] = await evidenciaDe('MOTOCICLETA', moto.placa);
   }
 
   const operativas = flota.filter((m) => m.estado === 'OPERATIVA').length;
@@ -74,6 +76,7 @@ export default async function Motos() {
         alertas={alertas}
         choferesLibres={choferesLibres}
         evidenciaGps={evidenciaGps}
+        evidenciaMoto={evidenciaMoto}
       />
     </main>
   );

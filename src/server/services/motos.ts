@@ -70,6 +70,7 @@ export interface MotoConAsignacion {
   tieneGps: boolean;
   gpsProveedor: string | null;
   gpsIdentificador: string | null;
+  gpsCorreo: string | null;
   gpsNotas: string | null;
   gpsRevisadoEn: Date | null;
   /** Chofer que la trae hoy, si alguno. */
@@ -108,6 +109,7 @@ function aVista(
     tieneGps: moto.tieneGps,
     gpsProveedor: moto.gpsProveedor,
     gpsIdentificador: moto.gpsIdentificador,
+    gpsCorreo: moto.gpsCorreo,
     gpsNotas: moto.gpsNotas,
     gpsRevisadoEn: moto.gpsRevisadoEn,
     choferId: vigente?.choferId ?? null,

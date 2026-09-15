@@ -423,7 +423,43 @@ se leen en voz alta.
 El intervalo de cambio de aceite vive en la ficha y manda sobre el general.
 Una moto vieja o de mucha carga puede pedirlo antes de los 2.000 km.
 
-### Rastreo satelital y su evidencia
+### Evidencia fotográfica
+
+Empezó siendo solo del GPS. Después hizo falta para el cambio de llantas, para
+el alta de una moto y para cada modificación. Hay **una sola tabla y un solo
+servicio**: repetirlo por cada caso habría multiplicado la misma validación, la
+misma ruta que la sirve y el mismo tope de tamaño, con tres oportunidades de
+que uno se quedara atrás.
+
+Se apunta a la entidad por tipo e identificador, igual que `eventos_auditoria`.
+No hay llave foránea porque el destino cambia según el tipo; a cambio, el
+borrado de la entidad tiene que llevarse su evidencia a mano.
+
+| Registro | Fotos | Al llenarse |
+|---|---|---|
+| Moto | 6 | sale la más vieja |
+| GPS | 6 | sale la más vieja |
+| Gasto | 4 | avisa, no bota nada |
+
+El gasto no rota a propósito. Es un hecho puntual y su foto es el comprobante
+de que se hizo: borrarla porque llegaron otras sería perder justo lo que se
+guardó para poder demostrarlo después.
+
+**Las imágenes viven en la base de datos.** Antes se escribían en `public/`,
+que servía cuando esto corría en un solo punto de caja con su disco. En Vercel
+ese disco es de solo lectura y lo que se escriba desaparece en el siguiente
+despliegue. Una evidencia que desaparece no es una evidencia.
+
+A cambio hay que cuidarles el tamaño. El navegador las encoge a 1600 píxeles de
+lado mayor antes de subirlas; una foto de 6,5 MB llega como 1 MB, y eso con
+ruido puro, que es el peor caso. El servidor mantiene su propio límite como
+última defensa contra lo que no pase por el navegador.
+
+Las fotos se sirven por `/api/evidencia/[id]`, que exige sesión. Muestran dónde
+va escondido el rastreador de una moto, el estado en que se recibió, o la
+factura de un taller.
+
+### Rastreo satelital
 
 Lo que se vigila no es que la moto **tenga** un GPS instalado, sino que alguien
 haya comprobado hace poco que sigue conectado y con corriente. Un rastreador
@@ -433,18 +469,9 @@ moto. Por eso cada foto que se sube mueve la fecha de última revisión.
 Se guardan el proveedor, el IMEI o número de unidad (el que hay que dictar por
 teléfono para reportar un robo), y notas de dónde va escondido el equipo.
 
-**Las imágenes viven en la base de datos, no en un archivo.** Las fotos de los
-repartidores se escriben en `public/`, que servía cuando el sistema corría en
-un solo punto de caja con su disco. En Vercel ese disco es de solo lectura y
-lo que se escriba desaparece en el siguiente despliegue. Una evidencia que
-desaparece no es una evidencia.
-
-A cambio hay que cuidarles el tamaño: 3 MB por foto y las 6 más recientes por
-moto. Al pasarse, sale la más vieja. La evidencia que interesa es la reciente.
-
-Las fotos se sirven por `/api/gps/[id]`, que exige sesión. Muestran dónde va
-escondido el rastreador de una moto; no son algo que deba poder ver cualquiera
-que dé con la dirección.
+Se guardan el proveedor, el **IMEI** del equipo, el **correo de la cuenta**
+donde reporta (con el que se entra a la plataforma a ver dónde anda la moto) y
+notas de dónde va escondido.
 
 Quitar el GPS de una moto no borra sus fotos. Son la prueba de que en su
 momento estuvo puesto, y esa historia no debería desaparecer porque alguien
@@ -487,7 +514,7 @@ cero: cero significaría que rodar no cuesta nada.
 
 ## 12. Estado actual
 
-Terminado y verificado con 224 comprobaciones automáticas más pruebas manuales
+Terminado y verificado con 234 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.

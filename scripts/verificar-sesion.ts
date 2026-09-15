@@ -45,6 +45,7 @@ async function intentar(cajeroId: string, pin: string): Promise<string> {
 async function main(): Promise<void> {
   exigirBaseDePruebas();
 
+  await prisma.evidencia.deleteMany();
   await prisma.registroMantenimiento.deleteMany();
   await prisma.asignacionMoto.deleteMany();
   await prisma.motocicleta.deleteMany();

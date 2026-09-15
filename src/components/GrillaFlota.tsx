@@ -24,7 +24,7 @@ import {
   accionLiberarMoto,
 } from '@/app/motos/acciones';
 import { FormularioMoto, type DatosMoto } from '@/components/FormularioMoto';
-import type { EvidenciaGps } from '@/server/services/gps';
+import type { Evidencia } from '@/server/services/evidencia';
 import type { AlertaMoto } from '@/server/services/mantenimiento';
 import type { MotoConAsignacion } from '@/server/services/motos';
 import type { EstadoMoto } from '@/types/enums';
@@ -35,7 +35,9 @@ interface Props {
   /** Repartidores activos que hoy no traen ninguna moto. */
   choferesLibres: Array<{ id: string; nombre: string }>;
   /** Fotos del GPS, agrupadas por placa. */
-  evidenciaGps: Record<string, EvidenciaGps[]>;
+  evidenciaGps: Record<string, Evidencia[]>;
+  /** Fotos de las motos en si, agrupadas por placa. */
+  evidenciaMoto: Record<string, Evidencia[]>;
 }
 
 const NOMBRE_CATEGORIA: Record<string, string> = {
@@ -110,7 +112,13 @@ const COLOR_ESTADO: Record<string, string> = {
   FUERA_DE_SERVICIO: 'text-alerta',
 };
 
-export function GrillaFlota({ flota, alertas, choferesLibres, evidenciaGps }: Props) {
+export function GrillaFlota({
+  flota,
+  alertas,
+  choferesLibres,
+  evidenciaGps,
+  evidenciaMoto,
+}: Props) {
   const router = useRouter();
   const [cambiando, setCambiando] = useState<MotoConAsignacion | null>(null);
   const [asignando, setAsignando] = useState<MotoConAsignacion | null>(null);
@@ -179,12 +187,17 @@ export function GrillaFlota({ flota, alertas, choferesLibres, evidenciaGps }: Pr
           setError(respuesta.mensaje);
           return;
         }
-        await accionGuardarGps(editando.placa, {
+        const gps = await accionGuardarGps(editando.placa, {
           tieneGps: datos.gps.tieneGps,
           proveedor: datos.gps.proveedor,
           identificador: datos.gps.identificador,
+          correo: datos.gps.correo,
           notas: datos.gps.notas,
         });
+        if (!gps.ok) {
+          setError(gps.mensaje);
+          return;
+        }
         setResultado(`${editando.placa} actualizada.`);
       } else {
         const respuesta = await accionCrearMoto(datos);
@@ -196,12 +209,17 @@ export function GrillaFlota({ flota, alertas, choferesLibres, evidenciaGps }: Pr
         // El GPS se guarda aparte porque hasta aqui la moto no existia y la
         // placa normalizada solo la conoce el servidor.
         if (datos.gps.tieneGps) {
-          await accionGuardarGps(respuesta.datos.placa, {
+          const gps = await accionGuardarGps(respuesta.datos.placa, {
             tieneGps: true,
             proveedor: datos.gps.proveedor,
             identificador: datos.gps.identificador,
+            correo: datos.gps.correo,
             notas: datos.gps.notas,
           });
+          if (!gps.ok) {
+            setError(gps.mensaje);
+            return;
+          }
         }
         // Quien teclea "mot-555 b" tiene que ver que quedo como MOT555B.
         setResultado(`${respuesta.datos.placa} agregada a la flota.`);
@@ -277,6 +295,7 @@ export function GrillaFlota({ flota, alertas, choferesLibres, evidenciaGps }: Pr
           moto={editando}
           hayComodin={hayComodin}
           evidenciaGps={editando ? (evidenciaGps[editando.placa] ?? []) : []}
+          evidenciaMoto={editando ? (evidenciaMoto[editando.placa] ?? []) : []}
           enProceso={enProceso}
           error={error}
           alGuardar={guardarMoto}
