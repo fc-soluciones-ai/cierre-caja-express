@@ -16,7 +16,10 @@ import { esErrorNegocio } from '@/server/errores';
 import { hashearPin } from '@/server/services/pin';
 import {
   autenticar,
+  autenticarRepartidor,
   cajeroPorToken,
+  repartidorPorToken,
+  repartidoresConAcceso,
   revocarSesionesDe,
 } from '@/server/services/sesion';
 import { exigirBaseDePruebas } from './guarda-pruebas';
@@ -149,8 +152,96 @@ async function main(): Promise<void> {
     'PIN incorrecto.',
   );
 
+  // -------------------------------------------------------------------------
+  console.log('\n--- Entrada del repartidor ---');
+  await prisma.cajero.update({ where: { id: cajero.id }, data: { estado: 'ACTIVO' } });
+
+  const PIN_REPARTIDOR = '4816';
+  const david = await prisma.chofer.create({
+    data: {
+      idMeseroSoftRestaurant: '10',
+      nombre: 'DAVID-R',
+      nombreNormalizado: 'DAVID-R',
+      pin: hashearPin(PIN_REPARTIDOR),
+    },
+  });
+  const sinAcceso = await prisma.chofer.create({
+    data: { idMeseroSoftRestaurant: '12', nombre: 'PINITO-R', nombreNormalizado: 'PINITO-R' },
+  });
+
+  const sesionRepartidor = await autenticarRepartidor(david.id, PIN_REPARTIDOR, 'PRUEBA');
+  comprobar('el repartidor entra con su PIN', sesionRepartidor.repartidor.nombre, 'DAVID-R');
+  comprobar(
+    'y su token lo resuelve a el',
+    (await repartidorPorToken(sesionRepartidor.token))?.id,
+    david.id,
+  );
+
+  // Lo que de verdad importa: ese token no abre ninguna pantalla de caja.
+  comprobar(
+    'el token del repartidor NO sirve como cajero',
+    await cajeroPorToken(sesionRepartidor.token),
+    null,
+  );
+
+  const sesionCaja = await autenticar(cajero.id, PIN, 'PRUEBA');
+  comprobar(
+    'y el del cajero tampoco sirve como repartidor',
+    await repartidorPorToken(sesionCaja.token),
+    null,
+  );
+
+  let sinPin = '';
+  try {
+    await autenticarRepartidor(sinAcceso.id, '1234', 'PRUEBA');
+  } catch (e) {
+    sinPin = esErrorNegocio(e) ? e.message : 'ERROR_INESPERADO';
+  }
+  comprobar('un repartidor sin PIN no entra', sinPin, 'PIN incorrecto.');
+  comprobar(
+    'y no aparece en la lista de la pantalla de entrada',
+    (await repartidoresConAcceso()).map((r) => r.nombre),
+    ['DAVID-R'],
+  );
+
+  // El bloqueo por intentos es el mismo que el de la caja.
+  for (let i = 0; i < 4; i += 1) {
+    await autenticarRepartidor(david.id, '0000', 'PRUEBA').catch(() => undefined);
+  }
+  let bloqueoRepartidor = '';
+  try {
+    await autenticarRepartidor(david.id, '0000', 'PRUEBA');
+  } catch (e) {
+    bloqueoRepartidor = esErrorNegocio(e) ? e.message : 'ERROR_INESPERADO';
+  }
+  comprobar(
+    'al quinto intento tambien se bloquea',
+    bloqueoRepartidor.startsWith('Demasiados'),
+    true,
+  );
+
+  await prisma.chofer.update({
+    where: { id: david.id },
+    data: { bloqueadoHasta: new Date(Date.now() - 1000) },
+  });
+  comprobar(
+    'pasado el bloqueo vuelve a entrar',
+    (await autenticarRepartidor(david.id, PIN_REPARTIDOR, 'PRUEBA')).repartidor.id,
+    david.id,
+  );
+
+  // Un repartidor dado de baja pierde el acceso, igual que un cajero.
+  const vivaRepartidor = await autenticarRepartidor(david.id, PIN_REPARTIDOR, 'PRUEBA');
+  await prisma.chofer.update({ where: { id: david.id }, data: { estado: 'INACTIVO' } });
+  comprobar(
+    'un repartidor inactivo pierde la sesion',
+    await repartidorPorToken(vivaRepartidor.token),
+    null,
+  );
+
   await prisma.sesion.deleteMany();
   await prisma.eventoAuditoria.deleteMany();
+  await prisma.chofer.deleteMany();
   await prisma.cajero.deleteMany();
 
   console.log(

@@ -189,6 +189,133 @@ export async function iniciarSesion(
   return cajero;
 }
 
+/**
+ * Entrada del repartidor a su propia pantalla.
+ *
+ * Mismo bloqueo por intentos y mismo mensaje unico que la caja: decir si
+ * fallo el PIN o el repartidor le regalaria a alguien la mitad de la
+ * respuesta.
+ *
+ * Un repartidor sin PIN no entra. Es el estado de todos hasta que el
+ * administrador le da acceso con "npm run pin:repartidor".
+ */
+export async function autenticarRepartidor(
+  choferId: string,
+  pin: string,
+  dispositivo?: string,
+): Promise<{ repartidor: RepartidorEnSesion; token: string; expiraEn: Date }> {
+  const chofer = await prisma.chofer.findUnique({ where: { id: choferId } });
+
+  const credencialInvalida = () => new ErrorNegocio('DATOS_INVALIDOS', 'PIN incorrecto.');
+
+  if (!chofer || chofer.estado !== 'ACTIVO' || !chofer.pin) {
+    // Se deriva contra el senuelo aunque no exista, para que el tiempo de
+    // respuesta no delate cuales repartidores tienen acceso.
+    verificarPin(pin, HASH_SENUELO);
+    throw credencialInvalida();
+  }
+
+  if (chofer.bloqueadoHasta && chofer.bloqueadoHasta > new Date()) {
+    const minutos = Math.ceil((chofer.bloqueadoHasta.getTime() - Date.now()) / 60_000);
+    throw new ErrorNegocio(
+      'DATOS_INVALIDOS',
+      `Demasiados intentos fallidos. Espere ${minutos} minuto${minutos === 1 ? '' : 's'}.`,
+    );
+  }
+
+  if (!verificarPin(pin, chofer.pin)) {
+    const intentos = chofer.intentosFallidos + 1;
+    const bloquear = intentos >= INTENTOS_ANTES_DE_BLOQUEO;
+    const bloqueadoHasta = bloquear
+      ? new Date(Date.now() + minutosDeBloqueo(intentos) * 60_000)
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.chofer.update({
+        where: { id: chofer.id },
+        data: { intentosFallidos: intentos, bloqueadoHasta },
+      });
+      await registrarEvento(tx, {
+        tipo: 'LOGIN_FALLIDO',
+        choferId: chofer.id,
+        entidadTipo: 'Chofer',
+        entidadId: chofer.id,
+        dispositivo,
+        detalle: { quien: 'REPARTIDOR', intentosSeguidos: intentos },
+      });
+    });
+
+    if (bloquear) {
+      throw new ErrorNegocio(
+        'DATOS_INVALIDOS',
+        `Demasiados intentos fallidos. Espere ${minutosDeBloqueo(intentos)} minutos.`,
+      );
+    }
+    throw credencialInvalida();
+  }
+
+  const token = randomBytes(32).toString('hex');
+  const expiraEn = new Date(Date.now() + DURACION_SESION_SEGUNDOS * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.chofer.update({
+      where: { id: chofer.id },
+      data: { intentosFallidos: 0, bloqueadoHasta: null },
+    });
+    await tx.sesion.create({
+      data: { tokenHash: hashearToken(token), choferId: chofer.id, expiraEn, dispositivo },
+    });
+    await registrarEvento(tx, {
+      tipo: 'LOGIN',
+      choferId: chofer.id,
+      entidadTipo: 'Chofer',
+      entidadId: chofer.id,
+      dispositivo,
+      detalle: { quien: 'REPARTIDOR' },
+    });
+  });
+
+  return {
+    repartidor: {
+      id: chofer.id,
+      nombre: chofer.nombre,
+      codigo: chofer.idMeseroSoftRestaurant,
+    },
+    token,
+    expiraEn,
+  };
+}
+
+/** Abre la sesion del repartidor y deja la cookie. */
+export async function iniciarSesionRepartidor(
+  choferId: string,
+  pin: string,
+  dispositivo?: string,
+): Promise<RepartidorEnSesion> {
+  const { repartidor, token } = await autenticarRepartidor(choferId, pin, dispositivo);
+
+  cookies().set(COOKIE_SESION, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: DURACION_SESION_SEGUNDOS,
+    secure: process.env.NODE_ENV === 'production',
+  });
+
+  return repartidor;
+}
+
+/** Repartidores que ya tienen PIN, para la pantalla de entrada. */
+export async function repartidoresConAcceso(): Promise<
+  Array<{ id: string; nombre: string }>
+> {
+  return prisma.chofer.findMany({
+    where: { estado: 'ACTIVO', pin: { not: null } },
+    select: { id: true, nombre: true },
+    orderBy: { nombre: 'asc' },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Salida y lectura
 // ---------------------------------------------------------------------------
@@ -207,20 +334,79 @@ export async function cajeroDeSesion(): Promise<CajeroEnSesion | null> {
   return cajeroPorToken(cookies().get(COOKIE_SESION)?.value);
 }
 
-/** Resuelve un token a su cajero. Separado de la cookie para poder probarlo. */
+/**
+ * Resuelve un token a su cajero. Separado de la cookie para poder probarlo.
+ *
+ * Una sesion de REPARTIDOR devuelve null aqui, a proposito. Todas las
+ * pantallas de caja preguntan por esta funcion, asi que con eso solo, el
+ * token de un repartidor no abre ninguna de ellas. La puerta se cierra en un
+ * lugar y no en veinte.
+ */
 export async function cajeroPorToken(
   token: string | undefined,
 ): Promise<CajeroEnSesion | null> {
+  const sesion = await sesionPorToken(token);
+  if (!sesion?.cajero || sesion.cajero.estado !== 'ACTIVO') return null;
+
+  return { id: sesion.cajero.id, nombre: sesion.cajero.nombre, rol: sesion.cajero.rol };
+}
+
+export interface RepartidorEnSesion {
+  id: string;
+  nombre: string;
+  codigo: string;
+}
+
+/** Repartidor de la sesion actual, o null si quien entro no es uno. */
+export async function repartidorDeSesion(): Promise<RepartidorEnSesion | null> {
+  return repartidorPorToken(cookies().get(COOKIE_SESION)?.value);
+}
+
+export async function repartidorPorToken(
+  token: string | undefined,
+): Promise<RepartidorEnSesion | null> {
+  const sesion = await sesionPorToken(token);
+  if (!sesion?.chofer || sesion.chofer.estado !== 'ACTIVO') return null;
+
+  return {
+    id: sesion.chofer.id,
+    nombre: sesion.chofer.nombre,
+    codigo: sesion.chofer.idMeseroSoftRestaurant,
+  };
+}
+
+/** Igual que repartidorDeSesion pero falla si no hay nadie. */
+export async function exigirRepartidor(): Promise<RepartidorEnSesion> {
+  const repartidor = await repartidorDeSesion();
+  if (!repartidor) {
+    throw new ErrorNegocio(
+      'CHOFER_NO_ENCONTRADO',
+      'La sesion expiro. Vuelva a entrar con su PIN.',
+    );
+  }
+  return repartidor;
+}
+
+/**
+ * La sesion cruda, con su dueno sea quien sea.
+ *
+ * Aqui viven la caducidad y la marca de uso, una sola vez para los dos tipos
+ * de usuario.
+ */
+async function sesionPorToken(token: string | undefined) {
   if (!token || token.length !== 64) return null;
 
   const sesion = await prisma.sesion.findUnique({
     where: { tokenHash: hashearToken(token) },
-    include: { cajero: { select: { id: true, nombre: true, rol: true, estado: true } } },
+    include: {
+      cajero: { select: { id: true, nombre: true, rol: true, estado: true } },
+      chofer: {
+        select: { id: true, nombre: true, idMeseroSoftRestaurant: true, estado: true },
+      },
+    },
   });
 
-  if (!sesion || sesion.expiraEn < new Date() || sesion.cajero.estado !== 'ACTIVO') {
-    return null;
-  }
+  if (!sesion || sesion.expiraEn < new Date()) return null;
 
   // Marca de uso, para poder ver sesiones olvidadas en un equipo del local.
   // Solo se escribe si paso un rato, para no golpear la base en cada pantalla.
@@ -230,7 +416,7 @@ export async function cajeroPorToken(
       .catch(() => undefined);
   }
 
-  return { id: sesion.cajero.id, nombre: sesion.cajero.nombre, rol: sesion.cajero.rol };
+  return sesion;
 }
 
 /** Igual que cajeroDeSesion pero falla si no hay nadie. Para las acciones. */

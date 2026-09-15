@@ -17,7 +17,11 @@ import { redirect } from 'next/navigation';
 
 import { esErrorNegocio } from '@/server/errores';
 import { registrarAbono } from '@/server/services/abonos';
-import { cerrarSesion, iniciarSesion } from '@/server/services/sesion';
+import {
+  cerrarSesion,
+  iniciarSesion,
+  iniciarSesionRepartidor,
+} from '@/server/services/sesion';
 import { abrirTurnoManual, cancelarTurnoVacio } from '@/server/services/turnos';
 import { exigirCajero } from '@/server/services/sesion';
 
@@ -43,6 +47,24 @@ export async function accionEntrar(
   try {
     const cajero = await iniciarSesion(cajeroId, pin, 'CAJA-WEB');
     return { ok: true, datos: { nombre: cajero.nombre } };
+  } catch (e) {
+    return comoResultado(e);
+  }
+}
+
+/**
+ * Entrada del repartidor a su propia pantalla.
+ *
+ * Aparte de accionEntrar porque abre una sesion de otra clase: la de caja
+ * abre el tablero y el dinero, esta abre una pantalla de solo lectura.
+ */
+export async function accionEntrarRepartidor(
+  choferId: string,
+  pin: string,
+): Promise<Resultado<{ nombre: string }>> {
+  try {
+    const repartidor = await iniciarSesionRepartidor(choferId, pin, 'REPARTIDOR-WEB');
+    return { ok: true, datos: { nombre: repartidor.nombre } };
   } catch (e) {
     return comoResultado(e);
   }

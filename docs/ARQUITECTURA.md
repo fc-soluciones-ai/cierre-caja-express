@@ -512,9 +512,56 @@ cero: cero significaría que rodar no cuesta nada.
 
 ---
 
-## 12. Estado actual
+## 12. La pantalla del repartidor
 
-Terminado y verificado con 234 comprobaciones automáticas más pruebas manuales
+El repartidor entra con su propio PIN y ve **solo lo suyo**: cuánto lleva
+entregado, sus entregas una por una, lo que el reporte de ventas dice que
+vendió, y su moto con sus avisos. No puede recibir dinero, cerrar turnos, ver
+la caja ni ver a los demás.
+
+### Una sola puerta, dos llaves
+
+`Sesion` pasó a poder pertenecer a un usuario de caja **o** a un repartidor,
+en vez de crear una segunda tabla de sesiones. Así el bloqueo por intentos, la
+caducidad, la marca de uso y la revocación se escriben una sola vez. Una tabla
+aparte habría significado volver a escribir todo eso, con la mitad de las
+probabilidades de acordarse de cada detalle.
+
+### Dónde se cierra la puerta
+
+`cajeroPorToken` devuelve `null` para una sesión de repartidor. Todas las
+pantallas de caja preguntan por esa función, así que con eso solo, el token de
+un repartidor no abre ninguna. La puerta se cierra en un lugar y no en veinte.
+
+Está comprobado de las dos formas: que el token del repartidor no sirve como
+cajero, y que el del cajero no sirve como repartidor.
+
+### El id sale de la sesión, nunca de la dirección
+
+Todas las consultas de `services/repartidor.ts` filtran por el id que viene de
+su sesión. No hay ningún número en la dirección que alguien pueda cambiar para
+ver lo de otro.
+
+### Nadie entra hasta que se le dé acceso
+
+El PIN del repartidor es opcional y empieza vacío. Sin PIN no entra, y ni
+siquiera aparece en la lista de la pantalla de entrada. Se le da acceso con
+`npm run pin -- --repartidor "DAVID-R"`, y la pestaña de repartidores solo
+aparece cuando al menos uno tiene PIN.
+
+### Lo que todavía no hace el rol
+
+El rol del usuario de caja (`CAJERO`, `SUPERVISOR`, `ADMIN`) se guarda y viaja
+en la sesión, pero **ninguna pantalla lo consulta todavía**. Quien entra por la
+puerta de caja ve y puede todo. Separar esos tres niveles es trabajo pendiente;
+lo que ya está separado es la caja del repartidor, que era el límite que de
+verdad importaba.
+
+---
+
+## 13. Estado actual
+
+Terminado y verificado con 243 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.
@@ -556,7 +603,7 @@ Queda por decidir con el negocio:
 
 ---
 
-## 13. Las palabras que usa el negocio
+## 14. Las palabras que usa el negocio
 
 La pantalla dice **repartidor** y **usuario**. El código y la base de datos
 dicen `Chofer` y `Cajero`.

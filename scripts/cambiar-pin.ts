@@ -1,8 +1,9 @@
 /**
- * Cambia el PIN de un cajero.
+ * Cambia el PIN de un usuario de caja, o le da acceso a un repartidor.
  *
  *   npm run pin
  *   npm run pin -- --cajero "Administrador"
+ *   npm run pin -- --repartidor "DAVID-R"
  *
  * El PIN se teclea en la terminal y no se muestra en pantalla. Nunca se pasa
  * como argumento del comando a proposito: los argumentos quedan en el
@@ -90,21 +91,54 @@ async function main(): Promise<void> {
     );
   }
 
-  const nombreBuscado = argumento('cajero');
-  const cajero = nombreBuscado
-    ? await prisma.cajero.findFirst({ where: { nombre: nombreBuscado } })
-    : await prisma.cajero.findFirst({ where: { rol: 'ADMIN' }, orderBy: { createdAt: 'asc' } });
+  const nombreRepartidor = argumento('repartidor');
 
-  if (!cajero) {
+  // Un repartidor no es un usuario de caja: entra a su propia pantalla de
+  // consulta y no puede tocar dinero. Vive en otra tabla y se busca aparte.
+  const chofer = nombreRepartidor
+    ? await prisma.chofer.findFirst({
+        where: { nombre: { equals: nombreRepartidor, mode: 'insensitive' } },
+      })
+    : null;
+
+  if (nombreRepartidor && !chofer) {
+    const todos = await prisma.chofer.findMany({
+      where: { estado: 'ACTIVO' },
+      select: { nombre: true },
+    });
+    throw new Error(
+      `No se encontro ese repartidor. Los activos son: ${
+        todos.map((c) => c.nombre).join(', ') || 'ninguno'
+      }`,
+    );
+  }
+
+  const nombreBuscado = argumento('cajero');
+  const cajero = chofer
+    ? null
+    : nombreBuscado
+      ? await prisma.cajero.findFirst({ where: { nombre: nombreBuscado } })
+      : await prisma.cajero.findFirst({ where: { rol: 'ADMIN' }, orderBy: { createdAt: 'asc' } });
+
+  if (!chofer && !cajero) {
     const todos = await prisma.cajero.findMany({ select: { nombre: true, rol: true } });
     throw new Error(
-      `No se encontro ese cajero. Los registrados son: ${
+      `No se encontro ese usuario. Los registrados son: ${
         todos.map((c) => `${c.nombre} (${c.rol})`).join(', ') || 'ninguno'
       }`,
     );
   }
 
-  console.log(`Cambiando el PIN de: ${cajero.nombre} (${cajero.rol})\n`);
+  const quien = chofer
+    ? { id: chofer.id, nombre: chofer.nombre, que: 'repartidor', pinActual: chofer.pin }
+    : {
+        id: cajero!.id,
+        nombre: cajero!.nombre,
+        que: cajero!.rol.toLowerCase(),
+        pinActual: cajero!.pin as string | null,
+      };
+
+  console.log(`Cambiando el PIN de: ${quien.nombre} (${quien.que})\n`);
 
   const nuevo = porTuberia
     ? await leerDeStdin()
@@ -113,7 +147,7 @@ async function main(): Promise<void> {
   const motivo = motivoPinInvalido(nuevo);
   if (motivo) throw new Error(motivo);
 
-  if (verificarPin(nuevo, cajero.pin)) {
+  if (quien.pinActual && verificarPin(nuevo, quien.pinActual)) {
     throw new Error('Ese ya es el PIN actual. No se cambio nada.');
   }
 
@@ -125,24 +159,34 @@ async function main(): Promise<void> {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.cajero.update({ where: { id: cajero.id }, data: { pin: hashearPin(nuevo) } });
+    if (chofer) {
+      await tx.chofer.update({
+        where: { id: chofer.id },
+        data: { pin: hashearPin(nuevo), intentosFallidos: 0, bloqueadoHasta: null },
+      });
+    } else {
+      await tx.cajero.update({ where: { id: quien.id }, data: { pin: hashearPin(nuevo) } });
+    }
     // Queda constancia del cambio, nunca del PIN. Con tipo propio: marcarlo
     // como edicion de chofer ensuciaba el historial de los repartidores con
     // algo que no tiene nada que ver con ellos.
     await registrarEvento(tx, {
       tipo: 'PIN_CAMBIADO',
-      cajeroId: cajero.id,
-      entidadTipo: 'Cajero',
-      entidadId: cajero.id,
-      detalle: { cajero: cajero.nombre },
+      cajeroId: chofer ? null : quien.id,
+      choferId: chofer ? chofer.id : null,
+      entidadTipo: chofer ? 'Chofer' : 'Cajero',
+      entidadId: quien.id,
+      detalle: { quien: quien.nombre, que: quien.que },
     });
   });
 
   // Quien tenga la caja abierta con el PIN viejo queda fuera. Sin esto el
   // cambio no sirve de nada contra alguien que ya entro.
-  const cerradas = await revocarSesionesDe(cajero.id);
+  const cerradas = chofer
+    ? (await prisma.sesion.deleteMany({ where: { choferId: chofer.id } })).count
+    : await revocarSesionesDe(quien.id);
 
-  console.log(`\nPIN de ${cajero.nombre} cambiado.`);
+  console.log(`\nPIN de ${quien.nombre} cambiado.`);
   if (cerradas > 0) {
     console.log(`Se cerraron ${cerradas} sesion(es) que estaban abiertas.`);
   }

@@ -6,12 +6,15 @@
  */
 
 import { FormularioEntrada } from '@/components/FormularioEntrada';
-import { cajerosActivos } from '@/server/services/sesion';
+import { cajerosActivos, repartidoresConAcceso } from '@/server/services/sesion';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Entrar() {
-  const cajeros = await cajerosActivos();
+  const [cajeros, repartidores] = await Promise.all([
+    cajerosActivos(),
+    repartidoresConAcceso(),
+  ]);
 
   return (
     <main className="flex min-h-screen items-center justify-center p-5">
@@ -29,7 +32,7 @@ export default async function Entrar() {
             </p>
           </div>
         ) : (
-          <FormularioEntrada cajeros={cajeros} />
+          <FormularioEntrada cajeros={cajeros} repartidores={repartidores} />
         )}
       </div>
     </main>

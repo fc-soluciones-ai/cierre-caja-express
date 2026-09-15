@@ -80,16 +80,26 @@ model Sesion {
   /// SHA-256 del token que viaja en la cookie. Si alguien lee esta tabla no
   /// obtiene sesiones utilizables, igual que con el PIN.
   tokenHash   String   @unique @map("token_hash")
-  cajeroId    String   @map("cajero_id")
   createdAt   DateTime @default(now()) @map("created_at")
   expiraEn    DateTime @map("expira_en")
   /// Ultima vez que se uso, para poder cerrar sesiones olvidadas.
   ultimoUso   DateTime @default(now()) @map("ultimo_uso")
   dispositivo String?
 
-  cajero Cajero @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
+  /// De quien es la sesion. Exactamente uno de los dos, nunca ambos ni
+  /// ninguno: lo comprueba el servicio antes de crearla, y quien la lee
+  /// distingue por cual de los dos vino.
+  ///
+  /// Una sola tabla y no una por cada clase de usuario, para que el bloqueo
+  /// por intentos, la caducidad y la revocacion se escriban una sola vez.
+  cajeroId String? @map("cajero_id")
+  choferId String? @map("chofer_id")
+
+  cajero Cajero? @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
+  chofer Chofer? @relation(fields: [choferId], references: [id], onDelete: Cascade)
 
   @@index([cajeroId])
+  @@index([choferId])
   @@index([expiraEn])
   @@map("sesiones")
 }
@@ -114,7 +124,20 @@ model Chofer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // --- Entrada a su propia pantalla ----------------------------------------
+  //
+  // Opcional: un repartidor sin PIN sencillamente no entra, que es el estado
+  // de todos hasta que alguien le ponga uno. Lo que ve cuando entra es solo
+  // lo suyo; no puede recibir dinero ni cerrar turnos.
+
+  /// Hash scrypt del PIN, nunca el PIN. Null si todavia no se le dio acceso.
+  pin String?
+
+  intentosFallidos Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta   DateTime? @map("bloqueado_hasta")
+
   turnos       TurnoChofer[]
+  sesiones     Sesion[]
   ventasExcel  VentaChoferExcel[]
   asignaciones AsignacionMoto[]
   foto         FotoChofer?
