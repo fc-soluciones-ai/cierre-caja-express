@@ -24,6 +24,7 @@ import { efectivoTeoricoEnCaja, resumenChoferesEnTurno } from '@/server/services
 import { importarCarga, previsualizarCarga } from '@/server/services/cargas';
 import { cerrarTurnos, previsualizarCierre } from '@/server/services/cierres';
 import { crearChofer, desactivarChofer } from '@/server/services/choferes';
+import { bytesDeFotoChofer, guardarFotoChofer } from '@/server/services/fotos';
 import { hashearPin, motivoPinInvalido, verificarPin } from '@/server/services/pin';
 import {
   abrirTurnoManual,
@@ -184,6 +185,53 @@ async function main(): Promise<void> {
     dobleAnulacion = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
   }
   comprobar('no se puede anular dos veces', dobleAnulacion, 'ABONO_YA_ANULADO');
+
+  // -------------------------------------------------------------------------
+  console.log('\n--- Foto del repartidor ---');
+
+  // Un PNG de 1x1 valido y un JPG minimo. Lo que importa son sus firmas.
+  const png = Buffer.from(
+    '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154' +
+      '789c63000100000500010d0a2db40000000049454e44ae426082',
+    'hex',
+  );
+  const jpg = Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
+
+  let noEsFoto = '';
+  try {
+    await guardarFotoChofer(tono.id, Buffer.from('<html>no soy una foto</html>'));
+  } catch (e) {
+    noEsFoto = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('un archivo que no es imagen se rechaza', noEsFoto, 'DATOS_INVALIDOS');
+
+  let fotoVacia = '';
+  try {
+    await guardarFotoChofer(tono.id, Buffer.alloc(0));
+  } catch (e) {
+    fotoVacia = esErrorNegocio(e) ? e.codigo : 'ERROR_INESPERADO';
+  }
+  comprobar('una foto vacia se rechaza', fotoVacia, 'DATOS_INVALIDOS');
+
+  const url = await guardarFotoChofer(tono.id, png);
+  comprobar('la direccion apunta a la ruta que la sirve', url.startsWith(`/api/choferes/${tono.id}/foto`), true);
+  comprobar('y lleva un sufijo contra la cache', /\?v=[0-9a-f]{8}$/.test(url), true);
+
+  const guardada = await bytesDeFotoChofer(tono.id);
+  comprobar('el tipo sale de los bytes, no de la extension', guardada?.tipoMime, 'image/png');
+  comprobar('los bytes vuelven intactos', guardada?.contenido.equals(png), true);
+
+  // Reemplazar la foto sustituye la anterior, no acumula.
+  const otraUrl = await guardarFotoChofer(tono.id, jpg);
+  comprobar('la direccion cambia al reemplazarla', otraUrl !== url, true);
+  comprobar(
+    'y queda la nueva',
+    (await bytesDeFotoChofer(tono.id))?.tipoMime,
+    'image/jpeg',
+  );
+  comprobar('sin duplicar filas', await prisma.fotoChofer.count({ where: { choferId: tono.id } }), 1);
+
+  comprobar('un repartidor sin foto devuelve nada', await bytesDeFotoChofer(maria.id), null);
 
   // -------------------------------------------------------------------------
   console.log('\n--- Efectivo en caja ---');

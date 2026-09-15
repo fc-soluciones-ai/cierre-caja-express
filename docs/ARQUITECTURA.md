@@ -66,7 +66,6 @@ Cierre Caja Expres/
 │   ├── restaurar.ts             # Restauración con red de seguridad
 │   └── respaldo-diario.cmd      # Envoltorio para el Programador de tareas
 ├── respaldos/                   # Copias verificadas (fuera de git)
-├── public/choferes/             # Fotos de los repartidores
 └── src/
     ├── app/
     │   ├── layout.tsx           # Tema oscuro, zoom bloqueado
@@ -114,7 +113,7 @@ Cierre Caja Expres/
     │       ├── cierres.ts       # Módulo 3, conciliación transaccional
     │       ├── choferes.ts      # Módulo 4
     │       ├── exportar.ts      # Reporte a Excel
-    │       ├── fotos.ts         # Fotos validadas por sus bytes
+    │       ├── fotos.ts         # Foto del repartidor, en la base
     │       ├── historial.ts     # Módulo 5, solo lectura
     │       ├── pin.ts           # Derivación scrypt del PIN
     │       ├── respaldo.ts      # VACUUM INTO, verificación y retención
@@ -488,7 +487,7 @@ cero: cero significaría que rodar no cuesta nada.
 
 ## 12. Estado actual
 
-Terminado y verificado con 214 comprobaciones automáticas más pruebas manuales
+Terminado y verificado con 224 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.
@@ -547,6 +546,5 @@ Dos aclaraciones del negocio que conviene no olvidar:
 - **En Soft Restaurant el repartidor está dado de alta como mesero**, y por eso
   el cruce con el Excel se hace por `id_mesero_softrestaurant`.
 
-Lo único que conserva el nombre viejo de cara afuera es la carpeta de fotos,
-`public/choferes/`. Renombrarla dejaría sin imagen a los repartidores que ya
-tienen una.
+La carpeta `public/choferes/` conservaba el nombre viejo, pero ya no existe:
+las fotos pasaron a la base de datos y esa carpeta quedó sin uso.

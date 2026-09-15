@@ -22,8 +22,6 @@ prisma/dev.db*
 
 # Archivos Excel subidos por el operador
 storage/
-public/choferes/*
-!public/choferes/.gitkeep
 
 # SO
 Thumbs.db

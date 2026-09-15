@@ -3,9 +3,9 @@
 /**
  * Acciones del CRUD de repartidores.
  *
- * La foto entra como archivo y se valida por sus bytes antes de tocar el
- * disco. Un repartidor nunca se borra: se desactiva, porque sus turnos y
- * cierres son historia contable.
+ * La foto entra como archivo y se valida por sus bytes antes de guardarse. Un
+ * repartidor nunca se borra: se desactiva, porque sus turnos y cierres son
+ * historia contable.
  */
 
 import { revalidatePath } from 'next/cache';
@@ -18,7 +18,7 @@ import {
   editarChofer,
   reactivarChofer,
 } from '@/server/services/choferes';
-import { borrarFotoChofer, guardarFotoChofer } from '@/server/services/fotos';
+import { guardarFotoChofer } from '@/server/services/fotos';
 import { exigirCajero } from '@/server/services/sesion';
 
 export type Resultado<T> = { ok: true; datos: T } | { ok: false; mensaje: string };
@@ -99,15 +99,12 @@ export async function accionEditarChofer(formData: FormData): Promise<Resultado<
 
     const foto = await leerFoto(formData);
     if (foto) {
-      const anterior = await prisma.chofer.findUnique({
-        where: { id: choferId },
-        select: { fotoUrl: true },
-      });
+      // No hay nada que borrar despues: la foto vive en una fila por
+      // repartidor y guardarla reemplaza la que hubiera. Cuando eran archivos
+      // en disco si habia que quitar el anterior, porque cada uno tenia su
+      // propio nombre; borrar ahora seria borrar la que se acaba de guardar.
       const url = await guardarFotoChofer(choferId, foto);
       await prisma.chofer.update({ where: { id: choferId }, data: { fotoUrl: url } });
-      // La anterior se borra despues de que la nueva quedo guardada, para no
-      // dejar al repartidor sin foto si la escritura falla.
-      await borrarFotoChofer(anterior?.fotoUrl ?? null);
     }
 
     revalidatePath('/');

@@ -1,38 +1,38 @@
 /**
  * Fotos de los repartidores.
  *
- * Se guardan en public/choferes para que el navegador las sirva directo, sin
- * pasar por una ruta de la aplicacion. En un punto de caja no hay CDN ni
- * almacenamiento de objetos: hay un disco.
+ * POR QUE VIVEN EN LA BASE Y NO EN UN ARCHIVO
+ *
+ * La primera version las escribia en public/, que servia cuando el sistema
+ * corria en un solo punto de caja con su disco. Al publicarlo en Vercel eso
+ * dejo de funcionar: ahi el disco es de solo lectura, y aunque se pudiera
+ * escribir, lo escrito desaparece en el siguiente despliegue. La foto se subia
+ * en el local y el encargado no la veia desde la oficina.
+ *
+ * Ahora los bytes van a la tabla fotos_chofer, en una fila aparte de la del
+ * repartidor para que listar el padron no arrastre las imagenes de todos.
  *
  * El tipo de archivo se decide por los BYTES, no por la extension ni por el
- * Content-Type que declare el navegador. Ambos los controla quien sube el
- * archivo, y esta carpeta la sirve el servidor web tal cual.
+ * Content-Type que declare el navegador. Los dos los controla quien sube el
+ * archivo, y esos bytes se devuelven despues con el tipo que aqui se decida.
  */
 
 import { randomBytes } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 
+import { prisma } from '@/lib/db/prisma';
 import { ErrorNegocio } from '@/server/errores';
 
-const DIRECTORIO = path.join(process.cwd(), 'public', 'choferes');
-const RUTA_PUBLICA = '/choferes';
-
-/** 4 MB. Una foto de carnet no llega ni cerca. */
-const MAXIMO_BYTES = 4 * 1024 * 1024;
+/** 3 MB. Una foto de carnet no llega ni cerca, y estas van al respaldo. */
+const MAXIMO_BYTES = 3 * 1024 * 1024;
 
 /** Firmas de los formatos aceptados, comprobadas sobre el contenido real. */
-const FIRMAS: ReadonlyArray<{
-  extension: string;
-  coincide: (b: Buffer) => boolean;
-}> = [
+const FIRMAS: ReadonlyArray<{ tipoMime: string; coincide: (b: Buffer) => boolean }> = [
   {
-    extension: '.jpg',
+    tipoMime: 'image/jpeg',
     coincide: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
   },
   {
-    extension: '.png',
+    tipoMime: 'image/png',
     coincide: (b) =>
       b.length > 8 &&
       b[0] === 0x89 &&
@@ -45,14 +45,15 @@ const FIRMAS: ReadonlyArray<{
       b[7] === 0x0a,
   },
   {
-    extension: '.webp',
+    tipoMime: 'image/webp',
     coincide: (b) =>
-      b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' &&
+      b.length > 12 &&
+      b.subarray(0, 4).toString('latin1') === 'RIFF' &&
       b.subarray(8, 12).toString('latin1') === 'WEBP',
   },
 ];
 
-function extensionSegunContenido(contenido: Buffer): string {
+function tipoMimeSegunContenido(contenido: Buffer): string {
   const firma = FIRMAS.find((f) => f.coincide(contenido));
   if (!firma) {
     throw new ErrorNegocio(
@@ -60,14 +61,15 @@ function extensionSegunContenido(contenido: Buffer): string {
       'El archivo no es una imagen JPG, PNG ni WEBP.',
     );
   }
-  return firma.extension;
+  return firma.tipoMime;
 }
 
 /**
- * Guarda la foto y devuelve la ruta publica.
+ * Guarda la foto y devuelve la direccion donde pedirla.
  *
- * El nombre lleva un sufijo aleatorio para que al reemplazar la foto de un
- * repartidor el navegador no siga mostrando la anterior desde su cache.
+ * La direccion lleva un sufijo aleatorio que cambia en cada reemplazo. Sin el,
+ * el navegador seguiria mostrando la foto anterior desde su cache, porque la
+ * direccion seria la misma de siempre.
  */
 export async function guardarFotoChofer(
   choferId: string,
@@ -79,31 +81,29 @@ export async function guardarFotoChofer(
   if (contenido.length > MAXIMO_BYTES) {
     throw new ErrorNegocio(
       'DATOS_INVALIDOS',
-      'La foto pesa mas de 4 MB. Use una imagen mas pequena.',
+      'La foto pesa mas de 3 MB. Tomela de nuevo con menos resolucion.',
     );
   }
 
-  const extension = extensionSegunContenido(contenido);
-  // choferId es un cuid generado por la base, no texto del usuario, pero el
-  // basename evita cualquier duda sobre travesia de rutas.
-  const nombre = `${path.basename(choferId)}-${randomBytes(4).toString('hex')}${extension}`;
+  const tipoMime = tipoMimeSegunContenido(contenido);
 
-  await mkdir(DIRECTORIO, { recursive: true });
-  await writeFile(path.join(DIRECTORIO, nombre), contenido);
+  await prisma.fotoChofer.upsert({
+    where: { choferId },
+    create: { choferId, contenido, tipoMime },
+    update: { contenido, tipoMime, actualizadaEn: new Date() },
+  });
 
-  return `${RUTA_PUBLICA}/${nombre}`;
+  return `/api/choferes/${choferId}/foto?v=${randomBytes(4).toString('hex')}`;
 }
 
-/**
- * Borra una foto anterior. Falla en silencio: que quede un archivo huerfano
- * es preferible a que la edicion del repartidor se caiga por esto.
- */
-export async function borrarFotoChofer(rutaPublica: string | null): Promise<void> {
-  if (!rutaPublica || !rutaPublica.startsWith(`${RUTA_PUBLICA}/`)) return;
-  const nombre = path.basename(rutaPublica);
-  try {
-    await unlink(path.join(DIRECTORIO, nombre));
-  } catch {
-    // El archivo ya no estaba. No hay nada que hacer.
-  }
+/** Los bytes de una foto, para la ruta que la sirve. */
+export async function bytesDeFotoChofer(
+  choferId: string,
+): Promise<{ contenido: Buffer; tipoMime: string } | null> {
+  const foto = await prisma.fotoChofer.findUnique({
+    where: { choferId },
+    select: { contenido: true, tipoMime: true },
+  });
+  if (!foto) return null;
+  return { contenido: Buffer.from(foto.contenido), tipoMime: foto.tipoMime };
 }

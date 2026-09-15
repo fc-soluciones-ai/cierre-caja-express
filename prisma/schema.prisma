@@ -102,20 +102,51 @@ model Chofer {
 
   /// Nombre sin acentos y en mayusculas. Sirve para cruzar archivos que no
   /// traen idmesero. Se recalcula en cada escritura, no se edita a mano.
-  nombreNormalizado String   @map("nombre_normalizado")
-  fotoUrl           String?  @map("foto_url")
-  telefono          String?
-  estado            String   @default("ACTIVO") // ACTIVO | INACTIVO
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  nombreNormalizado String @map("nombre_normalizado")
+
+  /// Direccion donde el navegador pide la foto, con un sufijo que cambia en
+  /// cada reemplazo para que no siga mostrando la anterior desde su cache.
+  /// Los bytes viven en foto_chofer, no aqui. Ver FotoChofer.
+  fotoUrl String? @map("foto_url")
+
+  telefono  String?
+  estado    String   @default("ACTIVO") // ACTIVO | INACTIVO
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   turnos       TurnoChofer[]
   ventasExcel  VentaChoferExcel[]
   asignaciones AsignacionMoto[]
+  foto         FotoChofer?
 
   @@index([nombreNormalizado])
   @@index([estado])
   @@map("choferes")
+}
+
+/// La foto de un repartidor.
+///
+/// EN TABLA APARTE, NO EN UNA COLUMNA DE choferes
+///
+/// El tablero y la grilla listan repartidores a cada rato. Con los bytes en la
+/// misma fila, cada una de esas consultas arrastraria las fotos de todos sin
+/// que nadie las pidiera. Aqui hay que ir a buscarlas a proposito.
+///
+/// EN LA BASE Y NO EN UN ARCHIVO
+///
+/// Antes se escribian en public/, que servia cuando esto corria en un solo
+/// punto de caja con su disco. En Vercel ese disco es de solo lectura y lo que
+/// se escriba desaparece en el siguiente despliegue.
+model FotoChofer {
+  choferId String @id @map("chofer_id")
+  chofer   Chofer @relation(fields: [choferId], references: [id], onDelete: Cascade)
+
+  contenido Bytes
+  tipoMime  String @map("tipo_mime")
+
+  actualizadaEn DateTime @default(now()) @map("actualizada_en")
+
+  @@map("fotos_chofer")
 }
 
 // -----------------------------------------------------------------------------
