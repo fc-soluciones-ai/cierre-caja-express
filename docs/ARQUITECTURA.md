@@ -549,6 +549,32 @@ siquiera aparece en la lista de la pantalla de entrada. Se le da acceso con
 `npm run pin -- --repartidor "DAVID-R"`, y la pestaña de repartidores solo
 aparece cuando al menos uno tiene PIN.
 
+### El repartidor carga su propia gasolina
+
+Es quien está parado en la bomba con el odómetro a la vista y la factura en la
+mano. Pedirle que se lo dicte al cajero al volver es pedirle a dos personas que
+recuerden un número.
+
+Tres datos y nada más: el odómetro, lo que pagó, y de qué bomba. La moto no se
+elige porque **se busca la que él trae ahora mismo**, no la que mande la
+pantalla: si viniera de afuera, alguien podría cargarle la gasolina a la moto
+de otro. La categoría tampoco se elige, porque solo puede cargar gasolina.
+
+El taller, los repuestos y los seguros los sigue registrando la caja. Son
+gastos que el repartidor no decide.
+
+### Quién firma un gasto
+
+`RegistroMantenimiento` y `Evidencia` pasaron a llevar `cajero_id` **o**
+`chofer_id`, exactamente uno de los dos, como ya hacía `Sesion`. El servicio
+rechaza un gasto sin firma y uno firmado por los dos.
+
+Importa quién fue: un gasto que nadie firma no se le puede preguntar a nadie.
+Y la foto de la factura, que se pide en la misma pantalla apenas se guarda, es
+lo que permite revisarlo después.
+
+La regla del odómetro es la misma venga de donde venga: no retrocede.
+
 ### Lo que todavía no hace el rol
 
 El rol del usuario de caja (`CAJERO`, `SUPERVISOR`, `ADMIN`) se guarda y viaja
@@ -561,7 +587,7 @@ verdad importaba.
 
 ## 13. Estado actual
 
-Terminado y verificado con 243 comprobaciones automáticas más pruebas manuales
+Terminado y verificado con 249 comprobaciones automáticas más pruebas manuales
 en el navegador:
 
 - Esquema completo y garantías de integridad de la base.

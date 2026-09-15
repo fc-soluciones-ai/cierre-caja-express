@@ -17,6 +17,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { accionBorrarEvidencia, accionSubirEvidencia } from '@/app/motos/acciones';
+import { accionBorrarEvidenciaMia, accionSubirEvidenciaMia } from '@/app/mi/acciones';
 import { encogerImagen } from '@/lib/imagen';
 import type { Evidencia, TipoEntidad } from '@/server/services/evidencia';
 
@@ -31,6 +32,13 @@ interface Props {
   avisoSinRegistro?: string;
   /** Se llama despues de subir o borrar, por si el padre debe refrescarse. */
   alCambiar?: () => void;
+  /**
+   * Por cual puerta se sube.
+   *
+   * La foto queda firmada por quien la subio, y las acciones de caja exigen
+   * sesion de caja. Un repartidor tiene que pasar por las suyas o le rebotan.
+   */
+  canal?: 'CAJA' | 'REPARTIDOR';
 }
 
 export function PanelEvidencia({
@@ -41,6 +49,7 @@ export function PanelEvidencia({
   bloqueado = false,
   avisoSinRegistro = 'Guarde primero. Despues podra adjuntar las fotos.',
   alCambiar,
+  canal = 'CAJA',
 }: Props) {
   const router = useRouter();
   const archivoRef = useRef<HTMLInputElement>(null);
@@ -78,7 +87,10 @@ export function PanelEvidencia({
       cuerpo.set('descripcion', descripcion);
       cuerpo.set('archivo', encogida, encogida.name);
 
-      const respuesta = await accionSubirEvidencia(cuerpo);
+      const respuesta =
+        canal === 'CAJA'
+          ? await accionSubirEvidencia(cuerpo)
+          : await accionSubirEvidenciaMia(cuerpo);
       setTrabajando(false);
       if (archivoRef.current) archivoRef.current.value = '';
 
@@ -97,14 +109,17 @@ export function PanelEvidencia({
       alCambiar?.();
       router.refresh();
     },
-    [alCambiar, descripcion, entidadId, entidadTipo, router, tipo],
+    [alCambiar, canal, descripcion, entidadId, entidadTipo, router, tipo],
   );
 
   const borrar = useCallback(
     async (id: string) => {
       setTrabajando(true);
       setError(null);
-      const respuesta = await accionBorrarEvidencia(id);
+      const respuesta =
+        canal === 'CAJA'
+          ? await accionBorrarEvidencia(id)
+          : await accionBorrarEvidenciaMia(id);
       setTrabajando(false);
       if (!respuesta.ok) {
         setError(respuesta.mensaje);
@@ -115,7 +130,7 @@ export function PanelEvidencia({
       alCambiar?.();
       router.refresh();
     },
-    [alCambiar, router],
+    [alCambiar, canal, router],
   );
 
   const nombreDeTipo = (valor: string) =>

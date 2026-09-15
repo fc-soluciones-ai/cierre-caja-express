@@ -138,6 +138,7 @@ export async function evidenciaDe(
       tipoMime: true,
       contenido: true,
       cajero: { select: { nombre: true } },
+      chofer: { select: { nombre: true } },
     },
   });
 
@@ -148,7 +149,7 @@ export async function evidenciaDe(
     tipo: f.tipo,
     descripcion: f.descripcion,
     tomadaEn: f.tomadaEn,
-    cajeroNombre: f.cajero.nombre,
+    cajeroNombre: f.cajero?.nombre ?? f.chofer?.nombre ?? '?',
     tipoMime: f.tipoMime,
     peso: f.contenido.length,
   }));
@@ -195,10 +196,20 @@ export interface EntradaEvidencia {
   descripcion?: string | null;
 }
 
+/**
+ * Quien sube la foto: la caja o el propio repartidor.
+ *
+ * Exactamente uno de los dos. Un objeto y no dos parametros sueltos para que
+ * no se pueda llamar sin ninguno o con ambos.
+ */
+export type QuienSube = { cajeroId: string } | { choferId: string };
+
 export async function agregarEvidencia(
   entrada: EntradaEvidencia,
-  cajeroId: string,
+  quien: QuienSube,
 ): Promise<{ foto: Evidencia; sustituidas: number }> {
+  const firma =
+    'cajeroId' in quien ? { cajeroId: quien.cajeroId } : { choferId: quien.choferId };
   const configuracion = ENTIDADES[entrada.entidadTipo];
   if (!configuracion) {
     throw new ErrorNegocio('DATOS_INVALIDOS', 'No se sabe a que adjuntar esa foto.');
@@ -230,9 +241,14 @@ export async function agregarEvidencia(
         contenido: entrada.contenido,
         tipoMime,
         descripcion: (entrada.descripcion ?? '').trim() || null,
-        cajeroId,
+        ...firma,
       },
-      select: { id: true, tomadaEn: true, cajero: { select: { nombre: true } } },
+      select: {
+        id: true,
+        tomadaEn: true,
+        cajero: { select: { nombre: true } },
+        chofer: { select: { nombre: true } },
+      },
     });
 
     let sustituidas = 0;
@@ -269,7 +285,7 @@ export async function agregarEvidencia(
 
     await registrarEvento(tx, {
       tipo: 'EVIDENCIA',
-      cajeroId,
+      ...firma,
       entidadTipo: entrada.entidadTipo,
       entidadId: entrada.entidadId,
       detalle: { tipo: entrada.tipo, peso: entrada.contenido.length },
@@ -283,7 +299,7 @@ export async function agregarEvidencia(
         tipo: entrada.tipo,
         descripcion: (entrada.descripcion ?? '').trim() || null,
         tomadaEn: foto.tomadaEn,
-        cajeroNombre: foto.cajero.nombre,
+        cajeroNombre: foto.cajero?.nombre ?? foto.chofer?.nombre ?? '?',
         tipoMime,
         peso: entrada.contenido.length,
       },
@@ -292,7 +308,9 @@ export async function agregarEvidencia(
   });
 }
 
-export async function borrarEvidencia(id: string, cajeroId: string): Promise<void> {
+export async function borrarEvidencia(id: string, quien: QuienSube): Promise<void> {
+  const firma =
+    'cajeroId' in quien ? { cajeroId: quien.cajeroId } : { choferId: quien.choferId };
   await prisma.$transaction(async (tx) => {
     const foto = await tx.evidencia.findUnique({
       where: { id },
@@ -304,7 +322,7 @@ export async function borrarEvidencia(id: string, cajeroId: string): Promise<voi
 
     await registrarEvento(tx, {
       tipo: 'EVIDENCIA',
-      cajeroId,
+      ...firma,
       entidadTipo: foto.entidadTipo,
       entidadId: foto.entidadId,
       detalle: { accion: 'BORRADA' },

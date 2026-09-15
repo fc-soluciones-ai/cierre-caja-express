@@ -141,6 +141,8 @@ model Chofer {
   ventasExcel  VentaChoferExcel[]
   asignaciones AsignacionMoto[]
   foto         FotoChofer?
+  gastos       RegistroMantenimiento[]
+  evidencias   Evidencia[]
 
   @@index([nombreNormalizado])
   @@index([estado])
@@ -566,8 +568,13 @@ model Evidencia {
   descripcion String?
 
   tomadaEn DateTime @default(now()) @map("tomada_en")
-  cajeroId String   @map("cajero_id")
-  cajero   Cajero   @relation(fields: [cajeroId], references: [id])
+
+  /// Quien la subio. Exactamente uno de los dos, igual que en el gasto.
+  cajeroId String? @map("cajero_id")
+  choferId String? @map("chofer_id")
+
+  cajero Cajero? @relation(fields: [cajeroId], references: [id])
+  chofer Chofer? @relation(fields: [choferId], references: [id])
 
   @@index([entidadTipo, entidadId, tomadaEn])
   @@map("evidencias")
@@ -627,13 +634,22 @@ model RegistroMantenimiento {
   comprobanteUrl   String? @map("comprobante_url")
 
   timestamp DateTime @default(now())
-  cajeroId  String   @map("cajero_id")
+
+  /// Quien lo capturo. Exactamente uno de los dos, nunca ambos ni ninguno.
+  ///
+  /// La caja registra el taller y los repuestos. El repartidor registra su
+  /// propia gasolina, porque es quien esta parado en la bomba con el odometro
+  /// a la vista. Guardar cual de los dos fue importa: un gasto que nadie firma
+  /// no se le puede preguntar a nadie.
+  cajeroId String? @map("cajero_id")
+  choferId String? @map("chofer_id")
 
   /// Misma proteccion contra doble toque que en los abonos.
   claveIdempotencia String? @unique @map("clave_idempotencia")
 
   moto   Motocicleta @relation(fields: [placa], references: [placa], onDelete: Restrict)
-  cajero Cajero      @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  cajero Cajero?     @relation(fields: [cajeroId], references: [id], onDelete: Restrict)
+  chofer Chofer?     @relation(fields: [choferId], references: [id], onDelete: Restrict)
 
   @@index([placa, timestamp])
   @@index([categoria, timestamp])

@@ -197,7 +197,7 @@ export async function accionSubirEvidencia(
     const contenido = Buffer.from(await archivo.arrayBuffer());
     const resultado = await agregarEvidencia(
       { entidadTipo, entidadId, tipo, contenido, descripcion },
-      cajero.id,
+      { cajeroId: cajero.id },
     );
     refrescar();
     return { ok: true, datos: resultado };
@@ -209,7 +209,7 @@ export async function accionSubirEvidencia(
 export async function accionBorrarEvidencia(id: string): Promise<Resultado<null>> {
   try {
     const cajero = await exigirCajero();
-    await borrarEvidencia(id, cajero.id);
+    await borrarEvidencia(id, { cajeroId: cajero.id });
     refrescar();
     return { ok: true, datos: null };
   } catch (e) {

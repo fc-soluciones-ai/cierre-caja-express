@@ -11,6 +11,8 @@
  * que el repartidor hace veinte veces por noche.
  */
 
+import Link from 'next/link';
+
 import { accionSalir } from '@/app/acciones';
 import { formatearMoneda } from '@/lib/money/money';
 import type { AlertaMoto } from '@/server/services/mantenimiento';
@@ -88,6 +90,13 @@ export function PanelRepartidor({ repartidor, resumen }: Props) {
           </p>
         ) : null}
       </section>
+
+      <Link
+        href="/mi/gasolina"
+        className="boton-tactil mt-4 flex w-full items-center justify-center bg-entrada text-lg text-slate-950"
+      >
+        ⛽ Cargar gasolina
+      </Link>
 
       {resumen.ventas ? (
         <section className="tarjeta mt-4 p-5">

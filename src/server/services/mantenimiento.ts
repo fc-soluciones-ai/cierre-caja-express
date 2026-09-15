@@ -42,7 +42,17 @@ export interface EntradaMantenimiento {
   descripcion?: string;
   tallerOProveedor?: string;
   comprobanteUrl?: string;
-  cajeroId: string;
+
+  /**
+   * Quien lo capturo. Exactamente uno de los dos.
+   *
+   * La caja registra el taller y los repuestos; el repartidor registra su
+   * propia gasolina, que es quien esta parado en la bomba con el odometro a
+   * la vista.
+   */
+  cajeroId?: string;
+  choferId?: string;
+
   claveIdempotencia?: string;
 }
 
@@ -72,6 +82,18 @@ export async function registrarMantenimiento(
   if (!Number.isInteger(entrada.kilometrajeEvento) || entrada.kilometrajeEvento < 0) {
     throw new ErrorNegocio('DATOS_INVALIDOS', 'El kilometraje debe ser un numero entero de kilometros.');
   }
+
+  // Uno de los dos, nunca ambos ni ninguno: un gasto que nadie firma no se le
+  // puede preguntar a nadie despues.
+  if (Boolean(entrada.cajeroId) === Boolean(entrada.choferId)) {
+    throw new ErrorNegocio(
+      'DATOS_INVALIDOS',
+      'El gasto tiene que quedar firmado por quien lo registro.',
+    );
+  }
+  const firma = entrada.cajeroId
+    ? { cajeroId: entrada.cajeroId }
+    : { choferId: entrada.choferId };
 
   if (entrada.claveIdempotencia) {
     const previo = await prisma.registroMantenimiento.findUnique({
@@ -110,7 +132,7 @@ export async function registrarMantenimiento(
         descripcion: entrada.descripcion ?? null,
         tallerOProveedor: entrada.tallerOProveedor ?? null,
         comprobanteUrl: entrada.comprobanteUrl ?? null,
-        cajeroId: entrada.cajeroId,
+        ...firma,
         claveIdempotencia: entrada.claveIdempotencia ?? null,
       },
     });
@@ -120,17 +142,21 @@ export async function registrarMantenimiento(
       data: { kilometrajeActual: entrada.kilometrajeEvento },
     });
 
-    // Quien traia la moto queda anotado, para poder repartir el gasto por
-    // chofer mas adelante sin tener que reconstruirlo de memoria.
+    // Quien traia la moto queda anotado en el detalle, para poder repartir el
+    // gasto por repartidor mas adelante sin reconstruirlo de memoria.
+    //
+    // Va en el detalle y no en choferId del evento porque ese campo ahora
+    // significa "quien lo registro". Meter ahi al que traia la moto haria que
+    // la bitacora dijera que un repartidor capturo un gasto que capturo la
+    // caja.
     const asignacion = await tx.asignacionMoto.findFirst({
       where: { placa, fechaFin: null },
-      select: { choferId: true },
+      select: { chofer: { select: { nombre: true } } },
     });
 
     await registrarEvento(tx, {
       tipo: 'MANTENIMIENTO',
-      cajeroId: entrada.cajeroId,
-      choferId: asignacion?.choferId ?? null,
+      ...firma,
       entidadTipo: 'RegistroMantenimiento',
       entidadId: registro.id,
       monto: entrada.costoTotal,
@@ -140,6 +166,7 @@ export async function registrarMantenimiento(
         tipo: entrada.tipo,
         kilometraje: entrada.kilometrajeEvento,
         proveedor: entrada.tallerOProveedor ?? null,
+        laTraia: asignacion?.chofer.nombre ?? null,
       },
     });
 
@@ -432,7 +459,10 @@ export async function historialDeFlota(
     },
     orderBy: { timestamp: 'desc' },
     take: Math.min(limite, 500),
-    include: { cajero: { select: { nombre: true } } },
+    include: {
+      cajero: { select: { nombre: true } },
+      chofer: { select: { nombre: true } },
+    },
   });
 
   return registros.map((r) => ({
@@ -446,6 +476,6 @@ export async function historialDeFlota(
     kilometrajeEvento: r.kilometrajeEvento,
     tallerOProveedor: r.tallerOProveedor,
     comprobanteUrl: r.comprobanteUrl,
-    cajeroNombre: r.cajero.nombre,
+    cajeroNombre: r.cajero?.nombre ?? r.chofer?.nombre ?? '?',
   }));
 }
